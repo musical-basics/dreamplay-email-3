@@ -660,41 +660,42 @@ async function handleCopilot(request: Request, workspace: Workspace) {
 }
 
 export async function handleHermesRequest(request: Request, context: HermesRouteContext): Promise<NextResponse> {
-  const authError = requireHermesAuth(request);
-  if (authError) return authError;
-
-  const params = await context.params;
-  const workspaceResult = workspaceSchema.safeParse(params.workspace);
-  if (!workspaceResult.success) {
-    return errorResponse("Invalid workspace", 400, { allowed: workspaceSchema.options });
-  }
-
-  const path = params.path || [];
-  const resource = path[0] || "";
-  const method = request.method.toUpperCase();
-  const workspace = workspaceResult.data;
-
   try {
+    const authError = requireHermesAuth(request);
+    if (authError) return authError;
+
+    const params = await context.params;
+    const workspaceResult = workspaceSchema.safeParse(params.workspace);
+    if (!workspaceResult.success) {
+      return errorResponse("Invalid workspace", 400, { allowed: workspaceSchema.options });
+    }
+
+    const path = params.path || [];
+    const resource = path[0] || "";
+    const method = request.method.toUpperCase();
+    const workspace = workspaceResult.data;
+
     switch (resource) {
       case "campaigns":
-        return handleCampaigns(request, method, workspace, path);
+        return await handleCampaigns(request, method, workspace, path);
       case "subscribers":
-        return handleSubscribers(request, method, workspace, path);
+        return await handleSubscribers(request, method, workspace, path);
       case "tags":
-        return handleTags(request, method, workspace, path);
+        return await handleTags(request, method, workspace, path);
       case "chains":
-        return handleChains(request, method, workspace, path);
+        return await handleChains(request, method, workspace, path);
       case "merge-tags":
-        return handleMergeTags(method);
+        return await handleMergeTags(method);
       case "triggers":
-        return handleTriggers(request, method, workspace);
+        return await handleTriggers(request, method, workspace);
       case "copilot":
         if (method !== "POST") return errorResponse("Copilot only accepts POST", 405);
-        return handleCopilot(request, workspace);
+        return await handleCopilot(request, workspace);
       default:
         return routeNotFound(resource);
     }
   } catch (error) {
+    console.error("[hermes] unhandled error:", error);
     return errorResponse(error instanceof Error ? error.message : "Unexpected server error", 500);
   }
 }
