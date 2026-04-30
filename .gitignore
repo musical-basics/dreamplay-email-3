@@ -1,0 +1,22 @@
+# dependencies
+/node_modules
+/.pnpm-store
+
+# next.js
+/.next
+/out
+
+# production
+/build
+
+# env
+.env*.local
+
+# misc
+.DS_Store
+*.pem
+*.tsbuildinfo
+next-env.d.ts
+
+# generated docs/bundles
+*repomix*.xml
