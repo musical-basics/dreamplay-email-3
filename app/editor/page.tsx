@@ -105,6 +105,25 @@ export default function EditorPage() {
     setIsError(error);
   }
 
+  async function readJsonOrThrow(res: Response, fallback: string) {
+    const text = await res.text();
+    let payload: { data?: unknown; error?: string } | null = null;
+    if (text) {
+      try {
+        payload = JSON.parse(text);
+      } catch {
+        throw new Error(`Non-JSON response (status ${res.status}): ${text.slice(0, 200)}`);
+      }
+    }
+    if (!res.ok) {
+      throw new Error(payload?.error || `${fallback} (status ${res.status})`);
+    }
+    if (!payload) {
+      throw new Error(`Empty response (status ${res.status})`);
+    }
+    return payload;
+  }
+
   const refreshList = useCallback(async () => {
     setListLoading(true);
     setListError(null);
@@ -122,9 +141,8 @@ export default function EditorPage() {
       const res = await fetch(`/api/editor/${workspace}/campaigns?${params.toString()}`, {
         headers: headers(),
       });
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error || "List failed");
-      setList((payload.data || []) as CampaignListItem[]);
+      const payload = await readJsonOrThrow(res, "List failed");
+      setList(((payload.data as CampaignListItem[]) || []));
     } catch (error) {
       setListError(error instanceof Error ? error.message : "List failed");
       setList([]);
@@ -149,9 +167,7 @@ export default function EditorPage() {
       const res = await fetch(`/api/editor/${workspace}/campaigns/${id}`, {
         headers: headers(),
       });
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error || "Load failed");
-
+      const payload = await readJsonOrThrow(res, "Load failed");
       const campaign = payload.data as CampaignPayload;
       setCampaignId(campaign.id);
       setName(campaign.name || "");
@@ -197,8 +213,7 @@ export default function EditorPage() {
           variable_values: parsedVariableValues,
         }),
       });
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error || "Save failed");
+      await readJsonOrThrow(res, "Save failed");
       setMessage("Saved.");
       void refreshList();
     } catch (error) {

@@ -1,30 +1,31 @@
 import { handleHermesRequest, type HermesRouteContext } from "@/src/hermes/handler";
 
-function withServerAuth(request: Request) {
+async function withServerAuth(request: Request) {
   const key = process.env.HERMES_API_KEY;
   if (!key) return request;
+
   const headers = new Headers(request.headers);
   headers.set("authorization", `Bearer ${key}`);
-  return new Request(request.url, {
-    method: request.method,
-    headers,
-    body: request.body,
-    duplex: "half",
-  } as RequestInit & { duplex: "half" });
+
+  const init: RequestInit = { method: request.method, headers };
+  if (request.method !== "GET" && request.method !== "HEAD" && request.body) {
+    init.body = await request.arrayBuffer();
+  }
+  return new Request(request.url, init);
 }
 
-export function GET(request: Request, context: HermesRouteContext) {
-  return handleHermesRequest(withServerAuth(request), context);
+export async function GET(request: Request, context: HermesRouteContext) {
+  return handleHermesRequest(await withServerAuth(request), context);
 }
 
-export function POST(request: Request, context: HermesRouteContext) {
-  return handleHermesRequest(withServerAuth(request), context);
+export async function POST(request: Request, context: HermesRouteContext) {
+  return handleHermesRequest(await withServerAuth(request), context);
 }
 
-export function PATCH(request: Request, context: HermesRouteContext) {
-  return handleHermesRequest(withServerAuth(request), context);
+export async function PATCH(request: Request, context: HermesRouteContext) {
+  return handleHermesRequest(await withServerAuth(request), context);
 }
 
-export function DELETE(request: Request, context: HermesRouteContext) {
-  return handleHermesRequest(withServerAuth(request), context);
+export async function DELETE(request: Request, context: HermesRouteContext) {
+  return handleHermesRequest(await withServerAuth(request), context);
 }
