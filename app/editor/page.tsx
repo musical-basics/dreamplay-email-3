@@ -68,7 +68,6 @@ function formatDate(value: string) {
 export default function EditorPage() {
   const [workspace, setWorkspace] = useState<Workspace>("dreamplay_marketing");
   const [campaignId, setCampaignId] = useState("");
-  const [apiKey, setApiKey] = useState("");
   const [name, setName] = useState("");
   const [subject, setSubject] = useState("");
   const [html, setHtml] = useState(sampleHtml());
@@ -83,9 +82,6 @@ export default function EditorPage() {
   const [listError, setListError] = useState<string | null>(null);
 
   useEffect(() => {
-    const savedKey = window.sessionStorage.getItem("hermes_api_key");
-    if (savedKey) setApiKey(savedKey);
-
     const params = new URLSearchParams(window.location.search);
     const queryWorkspace = params.get("workspace");
     const queryCampaignId = params.get("campaignId");
@@ -97,13 +93,12 @@ export default function EditorPage() {
 
   const previewDoc = useMemo(() => html || sampleHtml(), [html]);
 
-  const headers = useCallback(() => {
-    window.sessionStorage.setItem("hermes_api_key", apiKey);
-    return {
+  const headers = useCallback(
+    () => ({
       "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    };
-  }, [apiKey]);
+    }),
+    []
+  );
 
   function setMessage(message: string, error = false) {
     setStatus(message);
@@ -111,12 +106,6 @@ export default function EditorPage() {
   }
 
   const refreshList = useCallback(async () => {
-    if (!apiKey) {
-      setListError("Enter API key.");
-      setList([]);
-      return;
-    }
-
     setListLoading(true);
     setListError(null);
 
@@ -130,7 +119,7 @@ export default function EditorPage() {
     }
 
     try {
-      const res = await fetch(`/api/hermes/${workspace}/campaigns?${params.toString()}`, {
+      const res = await fetch(`/api/editor/${workspace}/campaigns?${params.toString()}`, {
         headers: headers(),
       });
       const payload = await res.json();
@@ -142,24 +131,22 @@ export default function EditorPage() {
     } finally {
       setListLoading(false);
     }
-  }, [apiKey, workspace, listFilter, headers]);
+  }, [workspace, listFilter, headers]);
 
   useEffect(() => {
-    if (apiKey) {
-      void refreshList();
-    }
-  }, [apiKey, workspace, listFilter, refreshList]);
+    void refreshList();
+  }, [workspace, listFilter, refreshList]);
 
   async function loadCampaignById(id: string) {
-    if (!apiKey || !id) {
-      setMessage("Enter an API key and campaign ID first.", true);
+    if (!id) {
+      setMessage("Enter a campaign ID first.", true);
       return;
     }
 
     setBusy(true);
     setMessage("Loading campaign...");
     try {
-      const res = await fetch(`/api/hermes/${workspace}/campaigns/${id}`, {
+      const res = await fetch(`/api/editor/${workspace}/campaigns/${id}`, {
         headers: headers(),
       });
       const payload = await res.json();
@@ -184,8 +171,8 @@ export default function EditorPage() {
   }
 
   async function saveCampaign() {
-    if (!apiKey || !campaignId) {
-      setMessage("Enter an API key and campaign ID first.", true);
+    if (!campaignId) {
+      setMessage("Enter a campaign ID first.", true);
       return;
     }
 
@@ -200,7 +187,7 @@ export default function EditorPage() {
     setBusy(true);
     setMessage("Saving campaign...");
     try {
-      const res = await fetch(`/api/hermes/${workspace}/campaigns/${campaignId}`, {
+      const res = await fetch(`/api/editor/${workspace}/campaigns/${campaignId}`, {
         method: "PATCH",
         headers: headers(),
         body: JSON.stringify({
@@ -253,7 +240,7 @@ export default function EditorPage() {
             <div className="panel-header">
               <h2>Campaigns</h2>
               <div className="toolbar">
-                <button onClick={refreshList} disabled={listLoading || !apiKey}>
+                <button onClick={refreshList} disabled={listLoading}>
                   {listLoading ? "Loading..." : "Refresh"}
                 </button>
               </div>
@@ -279,9 +266,8 @@ export default function EditorPage() {
               </button>
             </div>
             <div className="list-body">
-              {!apiKey && <div className="list-empty">Enter your Hermes API key below to browse campaigns.</div>}
-              {apiKey && listError && <div className="list-empty error">{listError}</div>}
-              {apiKey && !listError && list.length === 0 && !listLoading && (
+              {listError && <div className="list-empty error">{listError}</div>}
+              {!listError && list.length === 0 && !listLoading && (
                 <div className="list-empty">No campaigns match this filter.</div>
               )}
               <ul className="campaign-list">
@@ -328,16 +314,6 @@ export default function EditorPage() {
                   <input value={campaignId} onChange={(event) => setCampaignId(event.target.value)} placeholder="UUID" />
                 </label>
               </div>
-
-              <label>
-                Hermes API key
-                <input
-                  value={apiKey}
-                  onChange={(event) => setApiKey(event.target.value)}
-                  type="password"
-                  placeholder="Stored in this browser session only"
-                />
-              </label>
 
               <label>
                 Name
