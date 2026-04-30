@@ -26,7 +26,6 @@ const campaignListFields = [
   "id",
   "name",
   "subject_line",
-  "preview_text",
   "status",
   "email_type",
   "is_template",
@@ -39,13 +38,12 @@ const campaignListFields = [
   "total_clicks",
   "scheduled_at",
   "scheduled_status",
-  "sent_at",
   "workspace",
   "created_at",
   "updated_at",
 ].join(",");
 
-const campaignDetailFields = `${campaignListFields},html_content,variable_values,from_name,from_email,sent_from_email,sent_to_emails`;
+const campaignDetailFields = `${campaignListFields},html_content,variable_values,sent_from_email`;
 
 const subscriberFields = [
   "id",
@@ -141,7 +139,7 @@ async function handleCampaigns(request: Request, method: string, workspace: Work
   if (method === "GET" && campaignId && action === "analytics") {
     const { data, error } = await supabase
       .from("campaigns")
-      .select("id,name,total_recipients,total_opens,total_clicks,total_conversions,revenue_attributed,status,workspace")
+      .select("id,name,total_recipients,total_opens,total_clicks,status,workspace")
       .eq("workspace", workspace)
       .eq("id", campaignId)
       .maybeSingle();

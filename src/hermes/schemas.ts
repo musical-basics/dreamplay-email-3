@@ -9,7 +9,6 @@ export const jsonObjectSchema = z.record(jsonValue);
 export const campaignCreateSchema = z.object({
   name: z.string().min(1),
   subject_line: z.string().optional().nullable(),
-  preview_text: z.string().optional().nullable(),
   html_content: z.string().optional().nullable(),
   variable_values: jsonObjectSchema.optional(),
   status: z.enum(["draft", "scheduled", "sending", "completed", "deleted"]).optional(),
@@ -20,8 +19,7 @@ export const campaignCreateSchema = z.object({
   parent_template_id: z.string().uuid().optional().nullable(),
   category: z.string().optional().nullable(),
   template_folder_id: z.string().uuid().optional().nullable(),
-  from_name: z.string().optional().nullable(),
-  from_email: z.string().email().optional().nullable(),
+  sent_from_email: z.string().email().optional().nullable(),
 });
 
 export const campaignPatchSchema = campaignCreateSchema.partial().omit({ name: true }).extend({
