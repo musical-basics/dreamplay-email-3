@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { Inngest } from "inngest";
+import { inngest } from "@/src/inngest/client";
 import { createAdminClient } from "@/src/lib/supabase";
 import { errorResponse, json, readJson, requireHermesAuth, zodErrorResponse } from "@/src/lib/http";
 import { listEnvelope, paginationFromUrl, rangeFor } from "@/src/lib/pagination";
@@ -94,12 +95,6 @@ async function dispatchCampaignSend(payload: Record<string, unknown>) {
   if (!process.env.INNGEST_EVENT_KEY) {
     throw new Error("INNGEST_EVENT_KEY is not configured");
   }
-
-  const inngest = new Inngest({
-    id: "dreamplay-email-3",
-    eventKey: process.env.INNGEST_EVENT_KEY,
-  });
-
   return inngest.send(payload as Parameters<Inngest["send"]>[0]);
 }
 
@@ -331,7 +326,7 @@ async function handleCampaigns(request: Request, method: string, workspace: Work
       if (update.error) return errorResponse(update.error.message, 500);
 
       await dispatchCampaignSend({
-        name: "campaign.scheduled-send",
+        name: "agent.campaign.scheduled-send",
         data: { campaignId, workspace, scheduledAt: parsed.data.scheduledAt },
       });
 
@@ -346,7 +341,7 @@ async function handleCampaigns(request: Request, method: string, workspace: Work
     if (update.error) return errorResponse(update.error.message, 500);
 
     await dispatchCampaignSend({
-      name: "campaign.send",
+      name: "agent.campaign.send",
       data: {
         campaignId,
         workspace,
