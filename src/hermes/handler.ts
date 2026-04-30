@@ -10,6 +10,7 @@ import {
   campaignCreateSchema,
   campaignPatchSchema,
   chainCreateSchema,
+  cloneCampaignSchema,
   copilotSchema,
   sendSchema,
   subscriberPatchSchema,
@@ -220,6 +221,67 @@ async function handleCampaigns(request: Request, method: string, workspace: Work
     if (error) return errorResponse(error.message, 500);
     if (!data) return errorResponse("Campaign not found", 404);
     return json({ data });
+  }
+
+  if (method === "POST" && campaignId && action === "clone") {
+    const body = await readJson(request);
+    const parsed = cloneCampaignSchema.safeParse(body);
+    if (!parsed.success) return zodErrorResponse(parsed.error);
+
+    const { data: original, error: fetchError } = await supabase
+      .from("campaigns")
+      .select("*")
+      .eq("workspace", workspace)
+      .eq("id", campaignId)
+      .maybeSingle();
+
+    if (fetchError) return errorResponse(fetchError.message, 500);
+    if (!original) return errorResponse("Campaign not found", 404);
+
+    const sourceVars = (original.variable_values || {}) as Record<string, unknown>;
+    const { subscriber_id: _drop, ...restVars } = sourceVars;
+    const overrides = parsed.data.variable_values || {};
+    const mergedVars: Record<string, unknown> = { ...restVars, ...overrides };
+    if (parsed.data.subscriber_ids?.length) {
+      mergedVars.subscriber_ids = parsed.data.subscriber_ids;
+    }
+    if (parsed.data.target_tag) {
+      mergedVars.target_tag = parsed.data.target_tag;
+    }
+
+    let name = parsed.data.name;
+    if (!name) {
+      if (parsed.data.subscriber_ids?.length) {
+        const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+        name = `${original.name} (Bulk Send ${today}, ${parsed.data.subscriber_ids.length} recipients)`;
+      } else if (parsed.data.target_tag) {
+        name = `${original.name} (Tag: ${parsed.data.target_tag})`;
+      } else {
+        name = original.name;
+      }
+    }
+
+    const insert = {
+      name,
+      status: "draft",
+      email_type: original.email_type || "campaign",
+      subject_line: original.subject_line,
+      html_content: original.html_content,
+      workspace,
+      variable_values: mergedVars,
+      parent_template_id: original.is_template ? original.id : original.parent_template_id || null,
+      is_template: parsed.data.is_template ?? false,
+      is_starred_template: parsed.data.is_starred_template ?? false,
+    };
+
+    const { data, error: insertError } = await supabase
+      .from("campaigns")
+      .insert(insert)
+      .select(campaignDetailFields)
+      .single();
+
+    if (insertError) return errorResponse(insertError.message, 500);
+    return json({ data }, 201);
   }
 
   if (method === "POST" && campaignId && action === "send") {

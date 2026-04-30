@@ -26,6 +26,15 @@ export const campaignPatchSchema = campaignCreateSchema.partial().omit({ name: t
   name: z.string().min(1).optional(),
 });
 
+export const cloneCampaignSchema = z.object({
+  name: z.string().min(1).optional(),
+  subscriber_ids: z.array(z.string().uuid()).optional(),
+  target_tag: z.string().min(1).optional(),
+  variable_values: jsonObjectSchema.optional(),
+  is_template: z.boolean().optional(),
+  is_starred_template: z.boolean().optional(),
+});
+
 export const sendSchema = z.object({
   scheduledAt: z.string().datetime().optional(),
   confirmTargetTag: z.boolean().optional(),
