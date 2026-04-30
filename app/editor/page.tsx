@@ -35,6 +35,14 @@ interface CampaignListItem {
 
 type ListFilter = "drafts" | "templates" | "all";
 
+interface AssetItem {
+  id: string;
+  filename: string;
+  public_url: string;
+  folder_path: string | null;
+  is_starred: boolean;
+}
+
 function sampleHtml() {
   return `<!DOCTYPE html>
 <html>
@@ -65,6 +73,43 @@ function formatDate(value: string) {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
+const VARIABLE_RE = /\{\{(\w+)\}\}/g;
+const SYSTEM_VARS = new Set(["first_name", "last_name", "email", "unsubscribe_url"]);
+const IMAGE_HINTS = ["img", "image", "logo", "hero", "photo", "banner", "src", "thumbnail", "icon"];
+
+function extractVariables(html: string): string[] {
+  const set = new Set<string>();
+  let match: RegExpExecArray | null;
+  VARIABLE_RE.lastIndex = 0;
+  while ((match = VARIABLE_RE.exec(html)) !== null) set.add(match[1]);
+  return Array.from(set).sort();
+}
+
+function substituteVariables(html: string, values: Record<string, unknown>): string {
+  return html.replace(VARIABLE_RE, (match, key: string) => {
+    const v = values[key];
+    if (v == null || v === "") return match;
+    return String(v);
+  });
+}
+
+function isImageVariable(name: string): boolean {
+  const lower = name.toLowerCase();
+  return IMAGE_HINTS.some((hint) => lower.includes(hint));
+}
+
+function safeParseObject(value: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(value || "{}");
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // ignore
+  }
+  return {};
+}
+
 export default function EditorPage() {
   const [workspace, setWorkspace] = useState<Workspace>("dreamplay_marketing");
   const [campaignId, setCampaignId] = useState("");
@@ -81,6 +126,13 @@ export default function EditorPage() {
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
 
+  const [assets, setAssets] = useState<AssetItem[]>([]);
+  const [assetSearch, setAssetSearch] = useState("");
+  const [assetStarredOnly, setAssetStarredOnly] = useState(false);
+  const [assetLoading, setAssetLoading] = useState(false);
+  const [assetError, setAssetError] = useState<string | null>(null);
+  const [pickerTarget, setPickerTarget] = useState<string | null>(null);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const queryWorkspace = params.get("workspace");
@@ -91,7 +143,14 @@ export default function EditorPage() {
     if (queryCampaignId) setCampaignId(queryCampaignId);
   }, []);
 
-  const previewDoc = useMemo(() => html || sampleHtml(), [html]);
+  const parsedVariableValues = useMemo(() => safeParseObject(variableValues), [variableValues]);
+
+  const detectedVars = useMemo(() => extractVariables(html), [html]);
+
+  const previewDoc = useMemo(
+    () => substituteVariables(html || sampleHtml(), parsedVariableValues),
+    [html, parsedVariableValues]
+  );
 
   const headers = useCallback(
     () => ({
@@ -154,6 +213,46 @@ export default function EditorPage() {
   useEffect(() => {
     void refreshList();
   }, [workspace, listFilter, refreshList]);
+
+  const refreshAssets = useCallback(async () => {
+    setAssetLoading(true);
+    setAssetError(null);
+    const params = new URLSearchParams();
+    params.set("limit", "120");
+    if (assetSearch.trim()) params.set("search", assetSearch.trim());
+    if (assetStarredOnly) params.set("starred", "true");
+    try {
+      const res = await fetch(`/api/editor-assets?${params.toString()}`, { headers: headers() });
+      const payload = await readJsonOrThrow(res, "Asset list failed");
+      setAssets(((payload.data as AssetItem[]) || []));
+    } catch (error) {
+      setAssetError(error instanceof Error ? error.message : "Asset list failed");
+      setAssets([]);
+    } finally {
+      setAssetLoading(false);
+    }
+  }, [assetSearch, assetStarredOnly, headers]);
+
+  useEffect(() => {
+    void refreshAssets();
+  }, [assetStarredOnly, refreshAssets]);
+
+  function setVariableValue(key: string, value: string) {
+    const next = { ...parsedVariableValues };
+    if (value === "") delete next[key];
+    else next[key] = value;
+    setVariableValues(JSON.stringify(next, null, 2));
+  }
+
+  function pickAsset(asset: AssetItem) {
+    if (pickerTarget) {
+      setVariableValue(pickerTarget, asset.public_url);
+      setPickerTarget(null);
+    } else {
+      void navigator.clipboard?.writeText(asset.public_url);
+      setMessage(`Copied URL for ${asset.filename}.`);
+    }
+  }
 
   async function loadCampaignById(id: string) {
     if (!id) {
@@ -340,10 +439,50 @@ export default function EditorPage() {
                 <input value={subject} onChange={(event) => setSubject(event.target.value)} />
               </label>
 
-              <label>
-                Variable values
-                <textarea value={variableValues} onChange={(event) => setVariableValues(event.target.value)} />
-              </label>
+              <div className="vars-section">
+                <div className="vars-header">
+                  <span className="vars-title">Variables</span>
+                  <span className="vars-hint">{detectedVars.length} found in HTML</span>
+                </div>
+                {detectedVars.length === 0 && (
+                  <div className="vars-empty">No <code>{"{{"}variables{"}}"}</code> found in the HTML.</div>
+                )}
+                {detectedVars.map((key) => {
+                  const isImage = isImageVariable(key);
+                  const isSystem = SYSTEM_VARS.has(key);
+                  const value = parsedVariableValues[key];
+                  const stringValue = typeof value === "string" ? value : value == null ? "" : JSON.stringify(value);
+                  return (
+                    <div key={key} className="var-row">
+                      <label className="var-label">
+                        <span className="var-name">
+                          {`{{${key}}}`}
+                          {isSystem && <span className="var-tag">system</span>}
+                          {isImage && !isSystem && <span className="var-tag image">image</span>}
+                        </span>
+                        <input
+                          value={stringValue}
+                          onChange={(event) => setVariableValue(key, event.target.value)}
+                          placeholder={isSystem ? "Filled at send time" : isImage ? "Image URL" : "value"}
+                        />
+                      </label>
+                      {isImage && !isSystem && (
+                        <button type="button" className="var-pick" onClick={() => setPickerTarget(key)}>
+                          Pick image
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+                <details className="vars-raw">
+                  <summary>Raw JSON</summary>
+                  <textarea
+                    value={variableValues}
+                    onChange={(event) => setVariableValues(event.target.value)}
+                    spellCheck={false}
+                  />
+                </details>
+              </div>
 
               <label>
                 HTML
@@ -362,6 +501,68 @@ export default function EditorPage() {
           <iframe className="preview-frame" title="Email preview" srcDoc={previewDoc} />
         </div>
       </section>
+
+      {pickerTarget && (
+        <div className="modal-backdrop" onClick={() => setPickerTarget(null)}>
+          <div className="modal" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3>Pick an image</h3>
+                <p>
+                  Selecting will set <code>{`{{${pickerTarget}}}`}</code>.
+                </p>
+              </div>
+              <button onClick={() => setPickerTarget(null)}>Close</button>
+            </div>
+            <div className="modal-toolbar">
+              <input
+                value={assetSearch}
+                onChange={(event) => setAssetSearch(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void refreshAssets();
+                }}
+                placeholder="Search by filename"
+              />
+              <label className="checkbox-inline">
+                <input
+                  type="checkbox"
+                  checked={assetStarredOnly}
+                  onChange={(event) => setAssetStarredOnly(event.target.checked)}
+                />
+                Starred only
+              </label>
+              <button onClick={refreshAssets} disabled={assetLoading}>
+                {assetLoading ? "Loading..." : "Search"}
+              </button>
+            </div>
+            <div className="modal-body">
+              {assetError && <div className="list-empty error">{assetError}</div>}
+              {!assetError && assets.length === 0 && !assetLoading && (
+                <div className="list-empty">No assets match.</div>
+              )}
+              <div className="asset-grid">
+                {assets.map((asset) => (
+                  <button
+                    key={asset.id}
+                    type="button"
+                    className="asset-card"
+                    onClick={() => pickAsset(asset)}
+                    title={asset.filename}
+                  >
+                    <div className="asset-thumb">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={asset.public_url} alt={asset.filename} loading="lazy" />
+                      {asset.is_starred && <span className="asset-star">★</span>}
+                    </div>
+                    <div className="asset-name">{asset.filename}</div>
+                    {asset.folder_path && <div className="asset-folder">{asset.folder_path}</div>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
