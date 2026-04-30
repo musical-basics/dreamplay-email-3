@@ -110,6 +110,9 @@ function safeParseObject(value: string): Record<string, unknown> {
   return {};
 }
 
+const LS_WORKSPACE = "editor.workspace";
+const LS_CAMPAIGN_ID = "editor.campaignId";
+
 export default function EditorPage() {
   const [workspace, setWorkspace] = useState<Workspace>("dreamplay_marketing");
   const [campaignId, setCampaignId] = useState("");
@@ -137,10 +140,38 @@ export default function EditorPage() {
     const params = new URLSearchParams(window.location.search);
     const queryWorkspace = params.get("workspace");
     const queryCampaignId = params.get("campaignId");
+
+    let ws: Workspace = "dreamplay_marketing";
+    let id = "";
+
     if (queryWorkspace && workspaces.includes(queryWorkspace as Workspace)) {
-      setWorkspace(queryWorkspace as Workspace);
+      ws = queryWorkspace as Workspace;
+    } else {
+      try {
+        const stored = window.localStorage.getItem(LS_WORKSPACE);
+        if (stored && workspaces.includes(stored as Workspace)) ws = stored as Workspace;
+      } catch {
+        // ignore
+      }
     }
-    if (queryCampaignId) setCampaignId(queryCampaignId);
+
+    if (queryCampaignId) {
+      id = queryCampaignId;
+    } else {
+      try {
+        id = window.localStorage.getItem(LS_CAMPAIGN_ID) || "";
+      } catch {
+        // ignore
+      }
+    }
+
+    setWorkspace(ws);
+    setCampaignId(id);
+
+    if (id) {
+      void loadCampaignById(id, ws);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const parsedVariableValues = useMemo(() => safeParseObject(variableValues), [variableValues]);
@@ -254,7 +285,7 @@ export default function EditorPage() {
     }
   }
 
-  async function loadCampaignById(id: string) {
+  async function loadCampaignById(id: string, ws: Workspace = workspace) {
     if (!id) {
       setMessage("Enter a campaign ID first.", true);
       return;
@@ -263,7 +294,7 @@ export default function EditorPage() {
     setBusy(true);
     setMessage("Loading campaign...");
     try {
-      const res = await fetch(`/api/editor/${workspace}/campaigns/${id}`, {
+      const res = await fetch(`/api/editor/${ws}/campaigns/${id}`, {
         headers: headers(),
       });
       const payload = await readJsonOrThrow(res, "Load failed");
@@ -274,6 +305,12 @@ export default function EditorPage() {
       setHtml(campaign.html_content || "");
       setVariableValues(JSON.stringify(campaign.variable_values || {}, null, 2));
       setMessage(`Loaded ${campaign.name || campaign.id}.`);
+      try {
+        window.localStorage.setItem(LS_WORKSPACE, ws);
+        window.localStorage.setItem(LS_CAMPAIGN_ID, campaign.id);
+      } catch {
+        // localStorage unavailable, ignore
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Load failed", true);
     } finally {
@@ -415,7 +452,18 @@ export default function EditorPage() {
               <div className="form-row">
                 <label>
                   Workspace
-                  <select value={workspace} onChange={(event) => setWorkspace(event.target.value as Workspace)}>
+                  <select
+                    value={workspace}
+                    onChange={(event) => {
+                      const next = event.target.value as Workspace;
+                      setWorkspace(next);
+                      try {
+                        window.localStorage.setItem(LS_WORKSPACE, next);
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                  >
                     {workspaces.map((value) => (
                       <option key={value} value={value}>
                         {value}
