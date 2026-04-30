@@ -298,7 +298,6 @@ async function handleCampaigns(request: Request, method: string, workspace: Work
 
     if (error) return errorResponse(error.message, 500);
     if (!campaign) return errorResponse("Campaign not found", 404);
-    if (campaign.is_template) return errorResponse("Refusing to send a master template. Create a child campaign first.", 400);
 
     const variableValues = (campaign.variable_values || {}) as Record<string, unknown>;
     const subscriberIds = variableValues.subscriber_ids;
