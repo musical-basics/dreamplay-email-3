@@ -136,6 +136,8 @@ export default function EditorPage() {
   const [assetError, setAssetError] = useState<string | null>(null);
   const [pickerTarget, setPickerTarget] = useState<string | null>(null);
 
+  const [previewVersion, setPreviewVersion] = useState(0);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const queryWorkspace = params.get("workspace");
@@ -545,8 +547,21 @@ export default function EditorPage() {
         <div className="panel">
           <div className="panel-header">
             <h2>Preview</h2>
+            <div className="toolbar">
+              <button
+                onClick={() => setPreviewVersion((v) => v + 1)}
+                title="Reset the preview iframe back to the email (use after clicking a link)"
+              >
+                ← Back to email
+              </button>
+            </div>
           </div>
-          <iframe className="preview-frame" title="Email preview" srcDoc={previewDoc} />
+          <iframe
+            key={previewVersion}
+            className="preview-frame"
+            title="Email preview"
+            srcDoc={previewDoc}
+          />
         </div>
       </section>
 
