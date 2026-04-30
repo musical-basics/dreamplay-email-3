@@ -83,6 +83,8 @@ Allowed values: `"draft"`, `"scheduled"`, `"sending"`, `"completed"`, `"deleted"
 
 A JSON object of merge-tag values for the campaign. Keys correspond to `{{tokens}}` in `html_content`. Common keys observed in existing templates: `logo_src`, `hero_img`, `hero_link_url`, `secondary_img`, `unsubscribe_url`. The `{{first_name}}` token is populated per-recipient at send time, not from this object.
 
+For the full asset-loading model (image variables, asset library, upload flow, what happens at send time), see [ASSET_LOADING.md](ASSET_LOADING.md).
+
 ## Cloning Master Templates
 
 Hermes refuses to send a campaign with `is_template: true` (master templates are not sendable directly). To send a master template, clone it into a child campaign first via `POST /campaigns/{id}/clone`, then send the child.

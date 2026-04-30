@@ -188,7 +188,12 @@ export async function POST(request: Request) {
 
       log("info", `Found ${recipients.length} recipient(s)`, { total: recipients.length });
 
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dreamplay-email-3.vercel.app";
+      // Tracking and unsubscribe URLs route through TRACKING_BASE_URL so that
+      // /api/track/click, /api/track/open, and /unsubscribe resolve to a
+      // deployment that actually has those endpoints. dp-email-3 itself has
+      // not ported them yet (Phase 2c work). Default points at dp-email-2's
+      // existing endpoints, which read/write the same Supabase tables.
+      const baseUrl = process.env.TRACKING_BASE_URL || "https://email.dreamplaypianos.com";
 
       const unsubscribeFooter = `
 <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 12px; color: #6b7280; font-family: sans-serif;">
