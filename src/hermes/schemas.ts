@@ -100,6 +100,28 @@ export const triggerCreateSchema = z.object({
   metadata: jsonObjectSchema.optional(),
 });
 
+export const rotationCreateSchema = z.object({
+  name: z.string().min(1),
+  campaign_ids: z.array(z.string().uuid()).min(1),
+});
+
+export const rotationPatchSchema = z.object({
+  name: z.string().min(1).optional(),
+  campaign_ids: z.array(z.string().uuid()).min(1).optional(),
+  cursor_position: z.number().int().min(0).optional(),
+});
+
+export const rotationSendSchema = z.object({
+  subscriberIds: z.array(z.string().uuid()).min(1),
+  scheduledAt: z.string().datetime().optional(),
+  fromName: z.string().optional(),
+  fromEmail: z.string().email().optional(),
+  clickTracking: z.boolean().optional(),
+  openTracking: z.boolean().optional(),
+  resendClickTracking: z.boolean().optional(),
+  resendOpenTracking: z.boolean().optional(),
+});
+
 export const copilotSchema = z.object({
   messages: z
     .array(

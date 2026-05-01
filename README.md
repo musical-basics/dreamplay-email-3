@@ -6,8 +6,9 @@ page for human review.
 This repo intentionally avoids the full dashboard/editor surface from
 `dreamplay-email-2`. It keeps the pieces agents need:
 
-- `/api/hermes/{workspace}/...` for campaign, subscriber, tag, chain, trigger,
-  merge-tag, copilot, and send-dispatch operations.
+- `/api/hermes/{workspace}/...` for campaign, subscriber, tag, chain, rotation,
+  trigger, merge-tag, copilot, and send-dispatch operations. Documented in
+  [docs/EMAIL-AGENTS-API.md](docs/EMAIL-AGENTS-API.md).
 - `/editor` for loading a campaign, reviewing rendered HTML, and saving edits.
 - strict workspace validation and request schemas.
 - paginated list endpoints by default.
@@ -28,7 +29,7 @@ http://localhost:3002/editor
 
 ## API Auth
 
-Hermes endpoints require:
+Email Agents API endpoints require:
 
 ```http
 Authorization: Bearer <HERMES_API_KEY>

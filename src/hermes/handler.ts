@@ -13,6 +13,9 @@ import {
   chainCreateSchema,
   cloneCampaignSchema,
   copilotSchema,
+  rotationCreateSchema,
+  rotationPatchSchema,
+  rotationSendSchema,
   sendSchema,
   subscriberPatchSchema,
   subscriberUpsertSchema,
@@ -672,6 +675,182 @@ async function handleChains(request: Request, method: string, workspace: Workspa
   return errorResponse("Chain endpoint not found", 404);
 }
 
+async function handleRotations(request: Request, method: string, workspace: Workspace, path: string[]) {
+  const supabase = createAdminClient();
+  const rotationId = path[1];
+  const action = path[2];
+
+  if (method === "GET" && !rotationId) {
+    const url = new URL(request.url);
+    const pagination = paginationFromUrl(url);
+    const [from, to] = rangeFor(pagination);
+    const { data, count, error } = await supabase
+      .from("rotations")
+      .select("*", { count: "exact" })
+      .eq("workspace", workspace)
+      .order("updated_at", { ascending: false })
+      .range(from, to);
+    if (error) return errorResponse(error.message, 500);
+    return json(listEnvelope(data, pagination, count));
+  }
+
+  if (method === "GET" && rotationId && action === "analytics") {
+    const rotation = await supabase
+      .from("rotations")
+      .select("id, campaign_ids")
+      .eq("workspace", workspace)
+      .eq("id", rotationId)
+      .maybeSingle();
+    if (rotation.error) return errorResponse(rotation.error.message, 500);
+    if (!rotation.data) return errorResponse("Rotation not found", 404);
+
+    const templateIds: string[] = rotation.data.campaign_ids || [];
+
+    const [childrenRes, templatesRes] = await Promise.all([
+      supabase
+        .from("campaigns")
+        .select("id, name, parent_template_id, total_recipients, total_opens, total_clicks, status, created_at")
+        .eq("rotation_id", rotationId)
+        .order("created_at", { ascending: false }),
+      templateIds.length
+        ? supabase.from("campaigns").select("id, name").in("id", templateIds)
+        : Promise.resolve({ data: [] as { id: string; name: string }[], error: null }),
+    ]);
+
+    if (childrenRes.error) return errorResponse(childrenRes.error.message, 500);
+    if (templatesRes.error) return errorResponse(templatesRes.error.message, 500);
+
+    const templateNames: Record<string, string> = {};
+    for (const t of templatesRes.data || []) templateNames[t.id] = t.name;
+
+    const children = childrenRes.data || [];
+    const stats = templateIds.map((templateId) => {
+      const tChildren = children.filter((c) => c.parent_template_id === templateId);
+      const recipients = tChildren.reduce((s, c) => s + (c.total_recipients || 0), 0);
+      const opens = tChildren.reduce((s, c) => s + (c.total_opens || 0), 0);
+      const clicks = tChildren.reduce((s, c) => s + (c.total_clicks || 0), 0);
+      return {
+        templateId,
+        templateName: templateNames[templateId] || "Unknown",
+        sends: recipients,
+        opens,
+        clicks,
+        openRate: recipients > 0 ? Math.round((opens / recipients) * 100) : 0,
+        clickRate: recipients > 0 ? Math.round((clicks / recipients) * 100) : 0,
+        childCampaigns: tChildren,
+      };
+    });
+
+    return json({ data: stats });
+  }
+
+  if (method === "GET" && rotationId && !action) {
+    const { data, error } = await supabase
+      .from("rotations")
+      .select("*")
+      .eq("workspace", workspace)
+      .eq("id", rotationId)
+      .maybeSingle();
+
+    if (error) return errorResponse(error.message, 500);
+    if (!data) return errorResponse("Rotation not found", 404);
+    return json({ data });
+  }
+
+  if (method === "POST" && !rotationId) {
+    const body = await readJson(request);
+    const parsed = rotationCreateSchema.safeParse(body);
+    if (!parsed.success) return zodErrorResponse(parsed.error);
+
+    const insert = {
+      name: parsed.data.name,
+      campaign_ids: parsed.data.campaign_ids,
+      cursor_position: 0,
+      workspace,
+    };
+
+    const { data, error } = await supabase.from("rotations").insert(insert).select("*").single();
+    if (error) return errorResponse(error.message, 500);
+    return json({ data }, 201);
+  }
+
+  if (method === "PATCH" && rotationId && !action) {
+    const body = await readJson(request);
+    const parsed = rotationPatchSchema.safeParse(body);
+    if (!parsed.success) return zodErrorResponse(parsed.error);
+
+    const { data, error } = await supabase
+      .from("rotations")
+      .update({ ...parsed.data, updated_at: new Date().toISOString() })
+      .eq("workspace", workspace)
+      .eq("id", rotationId)
+      .select("*")
+      .maybeSingle();
+
+    if (error) return errorResponse(error.message, 500);
+    if (!data) return errorResponse("Rotation not found", 404);
+    return json({ data });
+  }
+
+  if (method === "POST" && rotationId && action === "send") {
+    const body = await readJson(request);
+    const parsed = rotationSendSchema.safeParse(body);
+    if (!parsed.success) return zodErrorResponse(parsed.error);
+
+    const rotation = await supabase
+      .from("rotations")
+      .select("id, campaign_ids")
+      .eq("workspace", workspace)
+      .eq("id", rotationId)
+      .maybeSingle();
+    if (rotation.error) return errorResponse(rotation.error.message, 500);
+    if (!rotation.data) return errorResponse("Rotation not found", 404);
+    if (!Array.isArray(rotation.data.campaign_ids) || rotation.data.campaign_ids.length === 0) {
+      return errorResponse("Rotation has no campaigns", 400);
+    }
+
+    const eventData = {
+      rotationId,
+      subscriberIds: parsed.data.subscriberIds,
+      fromName: parsed.data.fromName,
+      fromEmail: parsed.data.fromEmail,
+      clickTracking: parsed.data.clickTracking,
+      openTracking: parsed.data.openTracking,
+      resendClickTracking: parsed.data.resendClickTracking,
+      resendOpenTracking: parsed.data.resendOpenTracking,
+    };
+
+    if (parsed.data.scheduledAt) {
+      const update = await supabase
+        .from("rotations")
+        .update({
+          scheduled_at: parsed.data.scheduledAt,
+          scheduled_status: "pending",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("workspace", workspace)
+        .eq("id", rotationId);
+      if (update.error) return errorResponse(update.error.message, 500);
+
+      await dispatchCampaignSend({
+        name: "agent.rotation.scheduled-send",
+        data: { ...eventData, scheduledAt: parsed.data.scheduledAt },
+      });
+
+      return json({ data: { success: true, scheduled: true, scheduledAt: parsed.data.scheduledAt } });
+    }
+
+    await dispatchCampaignSend({
+      name: "agent.rotation.send",
+      data: eventData,
+    });
+
+    return json({ data: { success: true, scheduled: false } });
+  }
+
+  return errorResponse("Rotation endpoint not found", 404);
+}
+
 async function handleMergeTags(method: string) {
   if (method !== "GET") return errorResponse("Merge-tags endpoint not found", 404);
   const supabase = createAdminClient();
@@ -740,6 +919,8 @@ export async function handleHermesRequest(request: Request, context: HermesRoute
         return await handleTags(request, method, workspace, path);
       case "chains":
         return await handleChains(request, method, workspace, path);
+      case "rotations":
+        return await handleRotations(request, method, workspace, path);
       case "merge-tags":
         return await handleMergeTags(method);
       case "triggers":

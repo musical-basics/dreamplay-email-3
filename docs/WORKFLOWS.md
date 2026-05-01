@@ -56,7 +56,7 @@ For each batch you want to send (test or production):
    The child gets `parent_template_id` pointing at the master, copies the
    master's `variable_values` (with `subscriber_id` stripped), copies HTML
    and subject, gets `is_template: false`, gets a fresh id. The clone
-   endpoint is documented in [HERMES_API.md](HERMES_API.md).
+   endpoint is documented in [EMAIL-AGENTS-API.md](EMAIL-AGENTS-API.md).
 
 3. **Schedule the child.** Same Hermes API, send endpoint:
 
@@ -147,6 +147,51 @@ Open tracking still flows through dp-email-2's `/api/track/open` for now
 through any tracking endpoint; recipients land on the destination directly
 with `sid` and `cid` query params.
 
+### A/B rotation sends
+
+For round-robin A/B testing, two or more master templates are grouped
+into a `rotations` row with a `cursor_position`. The agent flow:
+
+1. **Pick recipients** the same way as a normal batch (workspace,
+   active, no Test Account, no done marker).
+
+2. **Send the rotation:**
+
+   ```
+   POST https://dreamplay-email-3.vercel.app/api/editor/{workspace}/rotations/{rotation_id}/send
+   {
+     "subscriberIds": ["uuid", "uuid", ...],
+     "fromName":   "Lionel Yu",
+     "fromEmail":  "lionel@musicalbasics.com",
+     "scheduledAt": "2026-05-01T18:30:00Z"
+   }
+   ```
+
+   Hermes dispatches `agent.rotation.send` (immediate) or
+   `agent.rotation.scheduled-send` (at `scheduledAt`).
+
+3. **At fire time** the Inngest function calls
+   `https://dreamplay-email-3.vercel.app/api/send-rotation`, which
+   round-robin assigns each subscriber to one of the rotation's
+   templates starting from `cursor_position`. For each template +
+   batch pair, it creates a child campaign
+   (`parent_template_id` = template, `rotation_id` = rotation) and
+   delegates per-batch delivery to `/api/send-stream`. Click tracking
+   uses sid/cid append, same as a normal campaign send.
+
+4. **Advance `cursor_position`** so the next rotation send picks up
+   where this one left off.
+
+5. **Tag the recipients as done** the same way as a normal batch.
+
+Per-template analytics are aggregated by
+`GET /rotations/{id}/analytics`. Note that `total_clicks` columns on
+child campaigns only reflect clicks that went through dp-email-2's
+redirect endpoint, which dp-email-3 does not use. For accurate click
+counts on rotation children, query `subscriber_events.type = "click"`
+or the analytics Supabase `analytics_logs` table filtered on the
+child campaign ids.
+
 ### Test sends vs production sends
 
 Test sends to the `Test Account` tagged subscribers (12 across all
@@ -178,7 +223,7 @@ project, and two Supabase projects (one for email data, one for analytics).
 - Hosted at: `dreamplay-email-3.vercel.app`
 - Lean agent-first API. The full Hermes API surface lives here:
   `/api/hermes/{workspace}/campaigns`, `/api/hermes/{workspace}/subscribers`,
-  etc. Documented in [HERMES_API.md](HERMES_API.md).
+  etc. Documented in [EMAIL-AGENTS-API.md](EMAIL-AGENTS-API.md).
 - Has its own send pipeline ported from dp-email-2 with
   brand-namespaced Inngest events (`agent.campaign.send`,
   `agent.campaign.scheduled-send`) so the two apps cannot accidentally
@@ -270,6 +315,9 @@ project, and two Supabase projects (one for email data, one for analytics).
 | Scheduling sends | dp-email-3 `POST /api/hermes/{w}/campaigns/{id}/send` (with `scheduledAt`) |
 | Image rendering, mustache, merge tags, send loop | dp-email-3 `app/api/send-stream/route.ts` |
 | Inngest scheduled-send fire | dp-email-3 `src/inngest/functions/agent-scheduled-send.ts` |
+| Rotation round-robin assignment + per-batch dispatch | dp-email-3 `app/api/send-rotation/route.ts` |
+| Rotation Inngest dispatch (immediate + scheduled) | dp-email-3 `src/inngest/functions/agent-rotation-send.ts`, `agent-rotation-scheduled-send.ts` |
+| Rotation create / list / send / analytics API | dp-email-3 `src/hermes/handler.ts` (handleRotations) |
 | Click tracking redirect | dp-email-2 `app/api/track/click/route.ts` |
 | Open tracking pixel | dp-email-2 `app/api/track/open/route.ts` |
 | Unsubscribe page | dp-email-2 `app/unsubscribe/page.tsx` |

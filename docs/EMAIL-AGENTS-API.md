@@ -1,4 +1,7 @@
-# Hermes API
+# Email Agents API
+
+Public name: **Email Agents API**. Internally codenamed "Hermes" (URL
+paths and env var names still use the `hermes` slug for back-compat).
 
 Base URL:
 
@@ -52,6 +55,12 @@ Responses use an envelope:
 - `POST /chains`
 - `POST /chains/{id}/activate`
 - `POST /chains/{id}/deactivate`
+- `GET /rotations`
+- `GET /rotations/{id}`
+- `GET /rotations/{id}/analytics`
+- `POST /rotations`
+- `PATCH /rotations/{id}`
+- `POST /rotations/{id}/send`
 - `GET /merge-tags`
 - `GET /triggers`
 - `POST /triggers`
@@ -140,3 +149,103 @@ Hermes refuses to send a campaign unless `variable_values` has one of:
 ```
 
 Agent workflows should prefer `subscriber_ids`.
+
+## Rotations (A/B sends)
+
+A rotation holds an ordered list of master template campaigns and a
+cursor. Each subscriber sent through the rotation is round-robin
+assigned to one of the templates, picking up from the cursor and
+advancing it. This is the standard A/B testing primitive.
+
+The rotation row stores:
+
+- `name`
+- `campaign_ids` (ordered, length = number of variants, typically 2-3)
+- `cursor_position` (next variant index to assign)
+- `workspace`
+- optional `scheduled_at` and `scheduled_status` for scheduled sends
+
+### Creating a rotation
+
+```
+POST /rotations
+{
+  "name": "Belgium A/B test",
+  "campaign_ids": ["uuid-template-A", "uuid-template-B"]
+}
+```
+
+Both campaign ids must already exist in the workspace and should be
+master templates (`is_template: true`). The rotation is created with
+`cursor_position: 0`.
+
+### Sending a rotation
+
+```
+POST /rotations/{id}/send
+{
+  "subscriberIds": ["uuid", "uuid", ...],
+  "fromName": "Lionel Yu",
+  "fromEmail": "lionel@musicalbasics.com",
+  "scheduledAt": "2026-05-01T18:30:00Z"
+}
+```
+
+Required: `subscriberIds`. All other fields are optional.
+
+If `scheduledAt` is omitted, the send fires immediately via the
+`agent.rotation.send` Inngest event. If `scheduledAt` is set, the
+rotation row is marked `scheduled_status: "pending"` and the send is
+held until that timestamp via the `agent.rotation.scheduled-send`
+Inngest event.
+
+Under the hood, both paths call `/api/send-rotation`, which:
+
+1. Round-robin assigns each subscriber to one of the rotation's
+   templates starting from `cursor_position`.
+2. For each (template, subscriber batch), inserts a child campaign
+   (`parent_template_id` = template, `rotation_id` = rotation) and
+   posts to `/api/send-stream` with the batch's subscriber ids. This
+   uses the same sid/cid click-tracking append pattern as a normal
+   campaign send. Click tracking does **not** redirect through
+   `/api/track/click`.
+3. Advances `cursor_position` by the total subscribers sent.
+
+### Rotation analytics
+
+```
+GET /rotations/{id}/analytics
+```
+
+Returns one row per template in `campaign_ids`, aggregating across
+every child campaign that was created from this rotation:
+
+```json
+{
+  "data": [
+    {
+      "templateId": "uuid",
+      "templateName": "Variant A",
+      "sends": 100,
+      "opens": 26,
+      "clicks": 6,
+      "openRate": 26,
+      "clickRate": 6,
+      "childCampaigns": [{ "id": "...", "total_recipients": 100, ... }]
+    },
+    ...
+  ]
+}
+```
+
+Open and click counts are read from each child's `total_opens` /
+`total_clicks` columns, which are written by the open-pixel and
+click-attribution paths in dp-email-2. Be aware that `total_clicks` is
+only populated for clicks that go through dp-email-2's
+`/api/track/click` redirect endpoint. Clicks tracked via sid/cid
+append (the default in dp-email-3) land in `subscriber_events` and on
+the analytics Supabase project, **not** on `total_clicks`. For the
+real click count, query `subscriber_events` filtered to
+`type = "click"` and the rotation's child campaign ids, or query the
+analytics Supabase project's `analytics_logs` filtered to
+`metadata->>'cid'` in the rotation's child campaign ids.
