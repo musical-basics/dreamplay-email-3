@@ -20,3 +20,7 @@ next-env.d.ts
 
 # generated docs/bundles
 *repomix*.xml
+
+# local working files (subscriber CSVs, scratch data — contain PII)
+/_work
+
