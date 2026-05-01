@@ -333,6 +333,11 @@ export async function POST(request: Request) {
       const updateData: Record<string, unknown> = {
         status: "completed",
         updated_at: new Date().toISOString(),
+        // total_recipients is what the dp-email-2 dashboard reads to compute
+        // openRate = total_opens / total_recipients. Without this update,
+        // the Open Rate / Click Rate columns render "—" for every send.
+        total_recipients: successCount,
+        total_audience_size: recipients.length,
       };
       if (firstResendEmailId) updateData.resend_email_id = firstResendEmailId;
       await supabaseAdmin.from("campaigns").update(updateData).eq("id", trackingCampaignId);
