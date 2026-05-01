@@ -241,24 +241,11 @@ export async function POST(request: Request) {
           });
           let personalHtml = personalHtml_;
 
-          // Click tracking — rewrite all hrefs through /api/track/click
+          // Click tracking — append sid (subscriber) and cid (campaign) params
+          // directly to each href. No redirect through /api/track/click. The
+          // recipient lands on the destination immediately; destination-side
+          // analytics read sid/cid for email attribution.
           if (clickTracking) {
-            personalHtml = personalHtml.replace(/href=(["'])(https?:\/\/[^"']+)\1/g, (match, quote, url) => {
-              if (url.includes("/unsubscribe")) return match;
-              if (url.includes("/api/track/")) return match;
-              let cleanUrl = url;
-              try {
-                const parsedUrl = new URL(url);
-                parsedUrl.searchParams.delete("sid");
-                parsedUrl.searchParams.delete("cid");
-                cleanUrl = parsedUrl.toString();
-              } catch {
-                // ignore
-              }
-              const trackUrl = `${baseUrl}/api/track/click?u=${encodeURIComponent(cleanUrl)}&c=${trackingCampaignId}&s=${sub.id}`;
-              return `href=${quote}${trackUrl}${quote}`;
-            });
-          } else {
             personalHtml = personalHtml.replace(/href=(["'])(https?:\/\/[^"']+)\1/g, (match, quote, url) => {
               if (url.includes("/unsubscribe")) return match;
               try {
