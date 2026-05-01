@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { Inngest } from "inngest";
 import { inngest } from "@/src/inngest/client";
 import { createAdminClient } from "@/src/lib/supabase";
-import { errorResponse, json, readJson, requireHermesAuth, zodErrorResponse } from "@/src/lib/http";
+import { errorResponse, json, readJson, requireAgentAuth, zodErrorResponse } from "@/src/lib/http";
 import { listEnvelope, paginationFromUrl, rangeFor } from "@/src/lib/pagination";
 import { workspaceSchema, type Workspace } from "@/src/lib/workspaces";
 import { generateCopilotEmail } from "@/src/ai/copilot";
@@ -23,7 +23,7 @@ import {
   triggerCreateSchema,
 } from "./schemas";
 
-export type HermesRouteContext = {
+export type AgentRouteContext = {
   params: Promise<{ workspace: string; path?: string[] }>;
 };
 
@@ -77,7 +77,7 @@ function uniqueStrings(values: string[]) {
 }
 
 function routeNotFound(resource: string) {
-  return errorResponse(`Unknown Hermes resource: ${resource}`, 404);
+  return errorResponse(`Unknown agent API resource: ${resource}`, 404);
 }
 
 async function ensureTagDefinitions(workspace: Workspace, tags: string[]) {
@@ -894,9 +894,9 @@ async function handleCopilot(request: Request, workspace: Workspace) {
   }
 }
 
-export async function handleHermesRequest(request: Request, context: HermesRouteContext): Promise<NextResponse> {
+export async function handleAgentRequest(request: Request, context: AgentRouteContext): Promise<NextResponse> {
   try {
-    const authError = requireHermesAuth(request);
+    const authError = requireAgentAuth(request);
     if (authError) return authError;
 
     const params = await context.params;
@@ -932,7 +932,7 @@ export async function handleHermesRequest(request: Request, context: HermesRoute
         return routeNotFound(resource);
     }
   } catch (error) {
-    console.error("[hermes] unhandled error:", error);
+    console.error("[agent-api] unhandled error:", error);
     return errorResponse(error instanceof Error ? error.message : "Unexpected server error", 500);
   }
 }

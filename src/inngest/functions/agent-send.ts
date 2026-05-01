@@ -5,7 +5,7 @@ const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dreamplay-email-3.ve
 /**
  * Inngest function: agent-send (event: agent.campaign.send)
  *
- * Triggered by dp-email-3's Hermes API for agent-initiated sends. Mirrors
+ * Triggered by dp-email-3's Agent API for agent-initiated sends. Mirrors
  * dp-email-2's api-send pattern but on a separate event namespace so the
  * two apps' pipelines don't double-process each other's events.
  *

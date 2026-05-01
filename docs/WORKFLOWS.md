@@ -30,7 +30,7 @@ Every campaign starts as a master template row in the `campaigns` table:
   targeting always lives on a child clone.
 
 The master template is stable. You edit it in `/editor`, the dashboard, or
-via Hermes PATCH. Everything downstream reads from it.
+via the Agent API PATCH. Everything downstream reads from it.
 
 ### Per-batch flow
 
@@ -58,7 +58,7 @@ For each batch you want to send (test or production):
    and subject, gets `is_template: false`, gets a fresh id. The clone
    endpoint is documented in [EMAIL-AGENTS-API.md](EMAIL-AGENTS-API.md).
 
-3. **Schedule the child.** Same Hermes API, send endpoint:
+3. **Schedule the child.** Same Agent API, send endpoint:
 
    ```
    POST https://dreamplay-email-3.vercel.app/api/editor/{workspace}/campaigns/{child_id}/send
@@ -70,7 +70,7 @@ For each batch you want to send (test or production):
    ```
 
    `scheduledAt` is required for a scheduled send; omit it for an immediate
-   send. The Hermes route writes `scheduled_at`, `scheduled_status: "pending"`,
+   send. The Agent API route writes `scheduled_at`, `scheduled_status: "pending"`,
    and `status: "scheduled"` on the child, then dispatches an Inngest event
    named `agent.campaign.scheduled-send` (or `agent.campaign.send` for
    immediate).
@@ -167,7 +167,7 @@ into a `rotations` row with a `cursor_position`. The agent flow:
    }
    ```
 
-   Hermes dispatches `agent.rotation.send` (immediate) or
+   The Agent API dispatches `agent.rotation.send` (immediate) or
    `agent.rotation.scheduled-send` (at `scheduledAt`).
 
 3. **At fire time** the Inngest function calls
@@ -221,8 +221,8 @@ project, and two Supabase projects (one for email data, one for analytics).
 
 #### `dreamplay-email-3` — agents (this repo)
 - Hosted at: `dreamplay-email-3.vercel.app`
-- Lean agent-first API. The full Hermes API surface lives here:
-  `/api/hermes/{workspace}/campaigns`, `/api/hermes/{workspace}/subscribers`,
+- Lean agent-first API. The full Agent API surface lives here:
+  `/api/agent/{workspace}/campaigns`, `/api/agent/{workspace}/subscribers`,
   etc. Documented in [EMAIL-AGENTS-API.md](EMAIL-AGENTS-API.md).
 - Has its own send pipeline ported from dp-email-2 with
   brand-namespaced Inngest events (`agent.campaign.send`,
@@ -311,13 +311,13 @@ project, and two Supabase projects (one for email data, one for analytics).
 | Capability | Where |
 |---|---|
 | Master templates | `campaigns` table in email Supabase |
-| Cloning master to child | dp-email-3 `POST /api/hermes/{w}/campaigns/{id}/clone` |
-| Scheduling sends | dp-email-3 `POST /api/hermes/{w}/campaigns/{id}/send` (with `scheduledAt`) |
+| Cloning master to child | dp-email-3 `POST /api/agent/{w}/campaigns/{id}/clone` |
+| Scheduling sends | dp-email-3 `POST /api/agent/{w}/campaigns/{id}/send` (with `scheduledAt`) |
 | Image rendering, mustache, merge tags, send loop | dp-email-3 `app/api/send-stream/route.ts` |
 | Inngest scheduled-send fire | dp-email-3 `src/inngest/functions/agent-scheduled-send.ts` |
 | Rotation round-robin assignment + per-batch dispatch | dp-email-3 `app/api/send-rotation/route.ts` |
 | Rotation Inngest dispatch (immediate + scheduled) | dp-email-3 `src/inngest/functions/agent-rotation-send.ts`, `agent-rotation-scheduled-send.ts` |
-| Rotation create / list / send / analytics API | dp-email-3 `src/hermes/handler.ts` (handleRotations) |
+| Rotation create / list / send / analytics API | dp-email-3 `src/agent/handler.ts` (handleRotations) |
 | Click tracking redirect | dp-email-2 `app/api/track/click/route.ts` |
 | Open tracking pixel | dp-email-2 `app/api/track/open/route.ts` |
 | Unsubscribe page | dp-email-2 `app/unsubscribe/page.tsx` |

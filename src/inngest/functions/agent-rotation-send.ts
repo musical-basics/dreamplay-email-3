@@ -5,7 +5,7 @@ const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dreamplay-email-3.ve
 /**
  * Inngest function: agent-rotation-send (event: agent.rotation.send)
  *
- * Triggered by dp-email-3's Hermes API for agent-initiated rotation sends.
+ * Triggered by dp-email-3's Agent API for agent-initiated rotation sends.
  * Thin wrapper around /api/send-rotation, mirroring agent-send for campaigns.
  */
 export const agentRotationSend = inngest.createFunction(

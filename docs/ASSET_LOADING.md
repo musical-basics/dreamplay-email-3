@@ -94,7 +94,7 @@ Response shape:
 
 ## Uploading a new asset (for agents)
 
-There is no Hermes API endpoint for uploads yet. To add a new asset, do these three steps in order. The Supabase service key is required.
+There is no Agent API endpoint for uploads yet. To add a new asset, do these three steps in order. The Supabase service key is required.
 
 1. **Upload bytes to storage.** SHA-256 the file content, use that as the storage path.
 
@@ -131,7 +131,7 @@ There is no Hermes API endpoint for uploads yet. To add a new asset, do these th
 Three ways an agent can fill `variable_values`:
 
 ```
-PATCH /api/hermes/<workspace>/campaigns/<id>
+PATCH /api/agent/<workspace>/campaigns/<id>
 { "variable_values": { "logo_src": "...", "hero_img": "...", "hero_link_url": "..." } }
 ```
 
@@ -140,7 +140,7 @@ This **replaces** the entire `variable_values` object. To preserve existing keys
 If the campaign is a master template, prefer `/clone`:
 
 ```
-POST /api/hermes/<workspace>/campaigns/<master>/clone
+POST /api/agent/<workspace>/campaigns/<master>/clone
 { "variable_values": { "logo_src": "..." }, "subscriber_ids": [...] }
 ```
 
@@ -178,7 +178,7 @@ Do **not** keep these in `variable_values` on a master:
 - `target_tag` (also per-clone)
 - Anything per-recipient (handled by merge tags)
 
-When you need to send, clone the master to a child with `subscriber_ids` set, then send the child. The Hermes send endpoint and the send-stream auto-clone path both handle this, but explicit clone-then-send gives the agent the child id and full control.
+When you need to send, clone the master to a child with `subscriber_ids` set, then send the child. The Agent API send endpoint and the send-stream auto-clone path both handle this, but explicit clone-then-send gives the agent the child id and full control.
 
 ## Common pitfalls
 

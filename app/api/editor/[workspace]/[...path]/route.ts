@@ -1,7 +1,7 @@
-import { handleHermesRequest, type HermesRouteContext } from "@/src/hermes/handler";
+import { handleAgentRequest, type AgentRouteContext } from "@/src/agent/handler";
 
 async function withServerAuth(request: Request) {
-  const key = process.env.HERMES_API_KEY;
+  const key = process.env.AGENT_API_KEY;
   if (!key) return request;
 
   const headers = new Headers(request.headers);
@@ -14,18 +14,18 @@ async function withServerAuth(request: Request) {
   return new Request(request.url, init);
 }
 
-export async function GET(request: Request, context: HermesRouteContext) {
-  return handleHermesRequest(await withServerAuth(request), context);
+export async function GET(request: Request, context: AgentRouteContext) {
+  return handleAgentRequest(await withServerAuth(request), context);
 }
 
-export async function POST(request: Request, context: HermesRouteContext) {
-  return handleHermesRequest(await withServerAuth(request), context);
+export async function POST(request: Request, context: AgentRouteContext) {
+  return handleAgentRequest(await withServerAuth(request), context);
 }
 
-export async function PATCH(request: Request, context: HermesRouteContext) {
-  return handleHermesRequest(await withServerAuth(request), context);
+export async function PATCH(request: Request, context: AgentRouteContext) {
+  return handleAgentRequest(await withServerAuth(request), context);
 }
 
-export async function DELETE(request: Request, context: HermesRouteContext) {
-  return handleHermesRequest(await withServerAuth(request), context);
+export async function DELETE(request: Request, context: AgentRouteContext) {
+  return handleAgentRequest(await withServerAuth(request), context);
 }

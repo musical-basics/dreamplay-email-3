@@ -21,12 +21,12 @@ export async function readJson(request: Request) {
   }
 }
 
-export function requireHermesAuth(request: Request) {
-  const expected = process.env.HERMES_API_KEY;
+export function requireAgentAuth(request: Request) {
+  const expected = process.env.AGENT_API_KEY;
   const actual = request.headers.get("authorization");
 
   if (!expected) {
-    return errorResponse("HERMES_API_KEY is not configured", 503);
+    return errorResponse("AGENT_API_KEY is not configured", 503);
   }
 
   if (actual !== `Bearer ${expected}`) {

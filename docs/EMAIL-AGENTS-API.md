@@ -1,18 +1,15 @@
 # Email Agents API
 
-Public name: **Email Agents API**. Internally codenamed "Hermes" (URL
-paths and env var names still use the `hermes` slug for back-compat).
-
 Base URL:
 
 ```text
-/api/hermes/{workspace}/{resource}
+/api/agent/{workspace}/{resource}
 ```
 
 Every request needs:
 
 ```http
-Authorization: Bearer <HERMES_API_KEY>
+Authorization: Bearer <AGENT_API_KEY>
 ```
 
 All list endpoints support:
@@ -96,7 +93,7 @@ For the full asset-loading model (image variables, asset library, upload flow, w
 
 ## Cloning Master Templates
 
-Hermes refuses to send a campaign with `is_template: true` (master templates are not sendable directly). To send a master template, clone it into a child campaign first via `POST /campaigns/{id}/clone`, then send the child.
+The Agent API refuses to send a campaign with `is_template: true` (master templates are not sendable directly). To send a master template, clone it into a child campaign first via `POST /campaigns/{id}/clone`, then send the child.
 
 The clone endpoint accepts an optional JSON body. All fields are optional:
 
@@ -136,7 +133,7 @@ The agent flow for sending to a specific subscriber list:
 
 ## Safe Sending
 
-Hermes refuses to send a campaign unless `variable_values` has one of:
+The Agent API refuses to send a campaign unless `variable_values` has one of:
 
 - `subscriber_id`
 - non-empty `subscriber_ids`

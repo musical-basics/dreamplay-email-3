@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/src/lib/supabase";
 
 export async function GET(request: Request) {
-  if (!process.env.HERMES_API_KEY) {
+  if (!process.env.AGENT_API_KEY) {
     return NextResponse.json({ error: "Server not configured" }, { status: 503 });
   }
 
