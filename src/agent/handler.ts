@@ -165,9 +165,9 @@ async function handleCampaigns(request: Request, method: string, workspace: Work
 
     let query = supabase
       .from("subscriber_events")
-      .select("subscriber_id, type, occurred_at, metadata", { count: "exact" })
+      .select("subscriber_id, type, url, created_at", { count: "exact" })
       .eq("campaign_id", campaignId)
-      .order("occurred_at", { ascending: false })
+      .order("created_at", { ascending: false })
       .range(from, to);
     if (type) query = query.eq("type", type);
 
