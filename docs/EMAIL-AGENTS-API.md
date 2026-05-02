@@ -136,8 +136,8 @@ The agent flow for sending to a specific subscriber list:
 ## Click events: scanner filtering
 
 `GET /campaigns/{id}/events?type=click&filter=human` returns the click
-events with email-security scanners and link unfurlers excluded. Two
-signals are applied:
+events with email-security scanners and link unfurlers excluded. Three
+signals are applied in order:
 
 1. **User-Agent blocklist** — the `subscriber_events.user_agent` is
    matched against a list of known scanner UA substrings (Microsoft
@@ -147,6 +147,10 @@ signals are applied:
    recipient's `sent_history.sent_at` are dropped. Real human clicks
    on marketing email almost never happen that fast; almost all
    sub-10s clicks are automated pre-fetches.
+3. **Burst detection** — for each subscriber, consecutive events
+   whose gaps are all ≤ 5 seconds form a "session". Sessions with
+   4+ events are flagged as scanner walks (humans rarely click 4+
+   distinct links in 5 seconds; scanners do, on every email).
 
 The endpoint returns the cleaned set in `data` (paginated) and surfaces
 diagnostics in the response envelope:
@@ -156,7 +160,7 @@ diagnostics in the response envelope:
   "data": [...],
   "pagination": { "limit": 25, "offset": 0, "count": 6 },
   "raw_count": 22,
-  "excluded": { "scanner_ua": 9, "too_fast": 7 }
+  "excluded": { "scanner_ua": 0, "too_fast": 7, "burst": 11 }
 }
 ```
 

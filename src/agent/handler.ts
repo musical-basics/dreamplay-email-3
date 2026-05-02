@@ -249,7 +249,43 @@ async function handleCampaigns(request: Request, method: string, workspace: Work
     }
 
     const TOO_FAST_MS = 10_000;
-    const exclusions = { scanner_ua: 0, too_fast: 0 };
+    const BURST_GAP_MS = 5_000; // events within this gap of the previous form a session
+    const BURST_MIN = 4; // session length > 3 (i.e. >= 4) is a burst
+
+    // Pre-compute the set of events that belong to a burst session.
+    // A "session" for a single subscriber is a maximal run of events whose
+    // consecutive gaps are all <= BURST_GAP_MS. If a session has BURST_MIN
+    // or more events, every event in the session is flagged as burst.
+    const eventKey = (e: { subscriber_id: string; created_at: string; url: string | null }) =>
+      `${e.subscriber_id}|${e.created_at}|${e.url || ""}`;
+    const burstKeys = new Set<string>();
+    const bySubscriber = new Map<string, typeof allEvents>();
+    for (const e of allEvents) {
+      const list = bySubscriber.get(e.subscriber_id) || [];
+      list.push(e);
+      bySubscriber.set(e.subscriber_id, list);
+    }
+    for (const subEvents of bySubscriber.values()) {
+      if (subEvents.length < BURST_MIN) continue;
+      const sorted = [...subEvents].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+      let session: typeof sorted = [sorted[0]];
+      const flush = () => {
+        if (session.length >= BURST_MIN) for (const e of session) burstKeys.add(eventKey(e));
+      };
+      for (let i = 1; i < sorted.length; i++) {
+        const gap = new Date(sorted[i].created_at).getTime() - new Date(sorted[i - 1].created_at).getTime();
+        if (gap <= BURST_GAP_MS) session.push(sorted[i]);
+        else {
+          flush();
+          session = [sorted[i]];
+        }
+      }
+      flush();
+    }
+
+    const exclusions = { scanner_ua: 0, too_fast: 0, burst: 0 };
     const kept: typeof allEvents = [];
     for (const e of allEvents) {
       const ua = (e.user_agent || "").toLowerCase();
@@ -264,6 +300,10 @@ async function handleCampaigns(request: Request, method: string, workspace: Work
           exclusions.too_fast++;
           continue;
         }
+      }
+      if (burstKeys.has(eventKey(e))) {
+        exclusions.burst++;
+        continue;
       }
       kept.push(e);
     }
