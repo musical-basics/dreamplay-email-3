@@ -143,10 +143,10 @@ signals are applied:
    matched against a list of known scanner UA substrings (Microsoft
    ATP Safe Links, Mimecast, Proofpoint, Slack/Discord/Twitter
    unfurlers, etc.).
-2. **Time-from-sent** — events that arrive within 30 seconds of the
+2. **Time-from-sent** — events that arrive within 10 seconds of the
    recipient's `sent_history.sent_at` are dropped. Real human clicks
    on marketing email almost never happen that fast; almost all
-   sub-30s clicks are automated pre-fetches.
+   sub-10s clicks are automated pre-fetches.
 
 The endpoint returns the cleaned set in `data` (paginated) and surfaces
 diagnostics in the response envelope:

@@ -248,7 +248,7 @@ async function handleCampaigns(request: Request, method: string, workspace: Work
       if (row.sent_at) sentAtMap.set(row.subscriber_id, new Date(row.sent_at).getTime());
     }
 
-    const TOO_FAST_MS = 30_000;
+    const TOO_FAST_MS = 10_000;
     const exclusions = { scanner_ua: 0, too_fast: 0 };
     const kept: typeof allEvents = [];
     for (const e of allEvents) {
