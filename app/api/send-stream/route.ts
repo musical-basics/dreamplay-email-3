@@ -20,6 +20,31 @@ const supabaseAdmin = createClient(
 type LogLevel = "info" | "success" | "warn" | "error";
 type LogFn = (level: LogLevel, message: string, meta?: Record<string, unknown>) => void;
 
+// Maps the From email's domain to the tracking base URL used for click
+// redirects, open pixels, and unsubscribe links. Keeps the visible link
+// domain in alignment with the visible sender so mailbox providers don't
+// flag the email as a phishing attempt.
+//
+// Each tracking host is just a CNAME (set up at the registrar) pointing
+// at the same Vercel project that hosts /api/track/click, /api/track/open,
+// and /unsubscribe. No per-host code.
+const FROM_DOMAIN_TO_TRACKING_BASE: Record<string, string> = {
+  "musicalbasics.com": "https://link.musicalbasics.com",
+  "ultimatepianist.com": "https://link.ultimatepianist.com",
+  "dreamplaypianos.com": "https://email.dreamplaypianos.com",
+  "email.dreamplaypianos.com": "https://email.dreamplaypianos.com",
+};
+
+function pickTrackingBaseUrl(fromEmail: string | null | undefined): string {
+  if (fromEmail) {
+    const domain = fromEmail.split("@").pop()?.toLowerCase().trim();
+    if (domain && FROM_DOMAIN_TO_TRACKING_BASE[domain]) {
+      return FROM_DOMAIN_TO_TRACKING_BASE[domain];
+    }
+  }
+  return process.env.TRACKING_BASE_URL || "https://email.dreamplaypianos.com";
+}
+
 export async function POST(request: Request) {
   const body = await request.json();
   const {
@@ -190,12 +215,21 @@ export async function POST(request: Request) {
 
       log("info", `Found ${recipients.length} recipient(s)`, { total: recipients.length });
 
-      // Tracking and unsubscribe URLs route through TRACKING_BASE_URL so that
-      // /api/track/click, /api/track/open, and /unsubscribe resolve to a
-      // deployment that actually has those endpoints. dp-email-3 itself has
-      // not ported them yet (Phase 2c work). Default points at dp-email-2's
-      // existing endpoints, which read/write the same Supabase tables.
-      const baseUrl = process.env.TRACKING_BASE_URL || "https://email.dreamplaypianos.com";
+      // Tracking host is picked per-send to align with the From email's
+      // domain. Mismatch between the visible From and embedded link domain
+      // is a strong phishing signal for mailbox providers (Gmail, Outlook,
+      // Mimecast, ATP) and tanks deliverability. Sending from
+      // lionel@musicalbasics.com with links going to email.dreamplaypianos.com
+      // would fail this alignment.
+      //
+      // Each From-domain maps to its own tracking subdomain. All point at
+      // the same deployed endpoint (currently dp-email-2's
+      // /api/track/click, /api/track/open, /unsubscribe) via DNS aliasing.
+      // No per-domain code; all hosts hit the same handlers.
+      const resolvedFromEmail =
+        fromEmail || (campaign.variable_values?.from_email as string | undefined) || null;
+      const baseUrl = pickTrackingBaseUrl(resolvedFromEmail);
+      log("info", `Tracking base URL: ${baseUrl}  (from: ${resolvedFromEmail ?? "(default)"})`);
 
       const unsubscribeFooter = `
 <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 12px; color: #6b7280; font-family: sans-serif;">
@@ -290,7 +324,8 @@ export async function POST(request: Request) {
           const personalSubject = await applyAllMergeTags(campaign.subject_line || "", sub);
 
           const resolvedFromName = fromName || campaign.variable_values?.from_name;
-          const resolvedFromEmail = fromEmail || campaign.variable_values?.from_email;
+          // resolvedFromEmail is in scope from above (computed once before
+          // the per-recipient loop, used for the tracking host pick).
 
           const sendPayload = {
             from:
