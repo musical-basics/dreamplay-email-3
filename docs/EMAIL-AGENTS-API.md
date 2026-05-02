@@ -38,6 +38,7 @@ Responses use an envelope:
 - `POST /campaigns/{id}/send`
 - `GET /campaigns/{id}/analytics`
 - `GET /campaigns/{id}/sent-history`
+- `GET /campaigns/{id}/events?type=open|click`
 - `GET /subscribers`
 - `GET /subscribers/{id}`
 - `GET /subscribers/{id}/history`

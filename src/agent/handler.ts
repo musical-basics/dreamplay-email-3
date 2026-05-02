@@ -148,6 +148,34 @@ async function handleCampaigns(request: Request, method: string, workspace: Work
     return json({ data });
   }
 
+  if (method === "GET" && campaignId && action === "events") {
+    const campaign = await supabase
+      .from("campaigns")
+      .select("id")
+      .eq("workspace", workspace)
+      .eq("id", campaignId)
+      .maybeSingle();
+    if (campaign.error) return errorResponse(campaign.error.message, 500);
+    if (!campaign.data) return errorResponse("Campaign not found", 404);
+
+    const url = new URL(request.url);
+    const type = url.searchParams.get("type");
+    const pagination = paginationFromUrl(url);
+    const [from, to] = rangeFor(pagination);
+
+    let query = supabase
+      .from("subscriber_events")
+      .select("subscriber_id, type, occurred_at, metadata", { count: "exact" })
+      .eq("campaign_id", campaignId)
+      .order("occurred_at", { ascending: false })
+      .range(from, to);
+    if (type) query = query.eq("type", type);
+
+    const { data, count, error } = await query;
+    if (error) return errorResponse(error.message, 500);
+    return json(listEnvelope(data, pagination, count));
+  }
+
   if (method === "GET" && campaignId && action === "sent-history") {
     const campaign = await supabase
       .from("campaigns")
