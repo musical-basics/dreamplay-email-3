@@ -65,7 +65,6 @@ const subscriberFields = [
   "shipping_city",
   "workspace",
   "created_at",
-  "updated_at",
 ].join(",");
 
 function normalizeEmail(email: string) {
@@ -377,7 +376,7 @@ async function handleSubscribers(request: Request, method: string, workspace: Wo
       .from("subscribers")
       .select(subscriberFields, { count: "exact" })
       .eq("workspace", workspace)
-      .order("updated_at", { ascending: false })
+      .order("created_at", { ascending: false })
       .range(from, to);
 
     const tag = url.searchParams.get("tag");
@@ -442,7 +441,7 @@ async function handleSubscribers(request: Request, method: string, workspace: Wo
 
     const { data, error } = await supabase
       .from("subscribers")
-      .update({ ...parsed.data, updated_at: new Date().toISOString() })
+      .update({ ...parsed.data })
       .eq("workspace", workspace)
       .eq("id", subscriberId)
       .select(subscriberFields)
@@ -478,7 +477,6 @@ async function handleSubscribers(request: Request, method: string, workspace: Wo
           email,
           tags,
           workspace,
-          updated_at: new Date().toISOString(),
         })
         .eq("workspace", workspace)
         .eq("id", existing.data.id)
@@ -523,7 +521,7 @@ async function handleSubscribers(request: Request, method: string, workspace: Wo
       const response = existing.data
         ? await supabase
             .from("subscribers")
-            .update({ tags, updated_at: new Date().toISOString() })
+            .update({ tags })
             .eq("workspace", workspace)
             .eq("id", existing.data.id)
         : await supabase.from("subscribers").insert({ email, tags, workspace, status: "active" });
