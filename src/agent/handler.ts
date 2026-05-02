@@ -564,9 +564,17 @@ async function handleSubscribers(request: Request, method: string, workspace: Wo
       .range(from, to);
 
     const tag = url.searchParams.get("tag");
+    const notTags = url.searchParams.getAll("not_tag");
     const search = url.searchParams.get("search");
     const status = url.searchParams.get("status");
     if (tag) query = query.contains("tags", [tag]);
+    // Repeat ?not_tag=X for each tag to exclude. Each adds a NOT-contains
+    // filter, AND'ed together. Lets agents pull the next N subscribers
+    // who haven't been targeted by a campaign yet (e.g. exclude both
+    // "Test Account" and "done-belgium-masterclass").
+    for (const nt of notTags) {
+      if (nt) query = query.not("tags", "cs", `{${nt}}`);
+    }
     if (search) query = query.ilike("email", `%${search}%`);
     if (status) query = query.eq("status", status);
 

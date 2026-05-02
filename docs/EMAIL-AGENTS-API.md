@@ -39,7 +39,7 @@ Responses use an envelope:
 - `GET /campaigns/{id}/analytics`
 - `GET /campaigns/{id}/sent-history`
 - `GET /campaigns/{id}/events?type=open|click&filter=raw|human`
-- `GET /subscribers`
+- `GET /subscribers` — supports `?tag=X`, `?not_tag=X` (repeatable), `?status=`, `?search=`
 - `GET /subscribers/{id}`
 - `GET /subscribers/{id}/history`
 - `POST /subscribers`
@@ -132,6 +132,60 @@ The agent flow for sending to a specific subscriber list:
 
 1. `POST /campaigns/{master_id}/clone` with `{"subscriber_ids": [...]}`.
 2. `POST /campaigns/{child_id}/send`.
+
+## Batch-send workflow (idempotent, API-only)
+
+The standard pattern for "send the next N subscribers from a large
+audience without double-sending" is three calls. No local state, no CSV.
+
+Pick a per-campaign **done marker tag** that's unique to this send
+(e.g. `done-belgium-masterclass`). Then:
+
+1. **Pick the next N untargeted subscribers** — combine `not_tag`
+   filters to exclude both test accounts and anyone already targeted:
+
+   ```
+   GET /subscribers
+       ?status=active
+       &not_tag=Test%20Account
+       &not_tag=done-belgium-masterclass
+       &limit=200
+   ```
+
+   Returns up to 200 active subscribers in the workspace who have
+   neither tag. The envelope's `pagination.count` is the remaining
+   total.
+
+2. **Schedule the send** with the ids you just got:
+
+   ```
+   POST /rotations/{id}/send
+   {
+     "subscriberIds": ["...", "..."],
+     "scheduledAt": "2026-05-02T15:00:00Z",
+     "fromName": "Lionel Yu",
+     "fromEmail": "lionel@musicalbasics.com",
+     "clickTrackingMode": "redirect"
+   }
+   ```
+
+   (Or `POST /campaigns/{id}/send` for a single-template send.)
+
+3. **Tag everyone you just scheduled with the done marker** so they're
+   excluded from the next pull:
+
+   ```
+   POST /subscribers/bulk-tag
+   {
+     "emails": ["...", "..."],
+     "tags": ["done-belgium-masterclass"]
+   }
+   ```
+
+The flow is naturally idempotent: re-running step 1 returns only
+subscribers not yet tagged. To audit progress, hit step 1 again with
+`limit=1` and read the `count` — that's how many remain. To audit
+already-sent, query with `?tag=done-belgium-masterclass`.
 
 ## Click events: scanner filtering
 
