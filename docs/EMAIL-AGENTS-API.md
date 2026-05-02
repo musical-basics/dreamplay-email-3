@@ -44,6 +44,7 @@ Responses use an envelope:
 - `POST /subscribers`
 - `PATCH /subscribers/{id}`
 - `POST /subscribers/bulk-tag`
+- `POST /subscribers/bulk-untag`
 - `GET /tags`
 - `POST /tags`
 - `DELETE /tags/{id}`

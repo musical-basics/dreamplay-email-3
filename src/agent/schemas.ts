@@ -76,6 +76,8 @@ export const bulkTagSchema = z.object({
   tags: z.array(z.string().min(1)).min(1).max(50),
 });
 
+export const bulkUntagSchema = bulkTagSchema;
+
 export const tagCreateSchema = z.object({
   name: z.string().min(1),
   color: z.string().min(1).optional().default("#6b7280"),

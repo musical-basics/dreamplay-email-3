@@ -8,6 +8,7 @@ import { workspaceSchema, type Workspace } from "@/src/lib/workspaces";
 import { generateCopilotEmail } from "@/src/ai/copilot";
 import {
   bulkTagSchema,
+  bulkUntagSchema,
   campaignCreateSchema,
   campaignPatchSchema,
   chainCreateSchema,
@@ -532,6 +533,60 @@ async function handleSubscribers(request: Request, method: string, workspace: Wo
     return json({
       data: {
         succeeded: results.filter((result) => result.success).length,
+        total: results.length,
+        results,
+      },
+    });
+  }
+
+  if (method === "POST" && subscriberId === "bulk-untag") {
+    const body = await readJson(request);
+    const parsed = bulkUntagSchema.safeParse(body);
+    if (!parsed.success) return zodErrorResponse(parsed.error);
+
+    const removeSet = new Set(parsed.data.tags);
+    const results = [];
+    for (const emailInput of parsed.data.emails) {
+      const email = normalizeEmail(emailInput);
+      const existing = await supabase
+        .from("subscribers")
+        .select("id,tags")
+        .eq("workspace", workspace)
+        .eq("email", email)
+        .maybeSingle();
+
+      if (existing.error) {
+        results.push({ email, success: false, error: existing.error.message });
+        continue;
+      }
+      if (!existing.data) {
+        results.push({ email, success: false, error: "subscriber not found in workspace" });
+        continue;
+      }
+
+      const before = (existing.data.tags || []) as string[];
+      const after = before.filter((t) => !removeSet.has(t));
+      if (before.length === after.length) {
+        results.push({ email, success: true, removed: 0 });
+        continue;
+      }
+
+      const update = await supabase
+        .from("subscribers")
+        .update({ tags: after })
+        .eq("workspace", workspace)
+        .eq("id", existing.data.id);
+
+      results.push(
+        update.error
+          ? { email, success: false, error: update.error.message }
+          : { email, success: true, removed: before.length - after.length }
+      );
+    }
+
+    return json({
+      data: {
+        succeeded: results.filter((r) => r.success).length,
         total: results.length,
         results,
       },
