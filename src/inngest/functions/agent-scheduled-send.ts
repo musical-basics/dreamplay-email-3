@@ -14,17 +14,27 @@ export const agentScheduledSend = inngest.createFunction(
   { id: "agent-scheduled-campaign-send" },
   { event: "agent.campaign.scheduled-send" },
   async ({ event, step }) => {
-    const { campaignId, scheduledAt, fromName, fromEmail, clickTracking, openTracking, resendClickTracking, resendOpenTracking } =
-      event.data as {
-        campaignId: string;
-        scheduledAt: string;
-        fromName?: string | null;
-        fromEmail?: string | null;
-        clickTracking?: boolean;
-        openTracking?: boolean;
-        resendClickTracking?: boolean;
-        resendOpenTracking?: boolean;
-      };
+    const {
+      campaignId,
+      scheduledAt,
+      fromName,
+      fromEmail,
+      clickTracking,
+      clickTrackingMode,
+      openTracking,
+      resendClickTracking,
+      resendOpenTracking,
+    } = event.data as {
+      campaignId: string;
+      scheduledAt: string;
+      fromName?: string | null;
+      fromEmail?: string | null;
+      clickTracking?: boolean;
+      clickTrackingMode?: "append" | "redirect";
+      openTracking?: boolean;
+      resendClickTracking?: boolean;
+      resendOpenTracking?: boolean;
+    };
 
     await step.sleepUntil("wait-for-schedule", new Date(scheduledAt));
 
@@ -58,6 +68,7 @@ export const agentScheduledSend = inngest.createFunction(
           fromName: fromName ?? null,
           fromEmail: fromEmail ?? null,
           clickTracking: clickTracking ?? true,
+          clickTrackingMode: clickTrackingMode ?? "append",
           openTracking: openTracking ?? true,
           resendClickTracking: resendClickTracking ?? false,
           resendOpenTracking: resendOpenTracking ?? false,

@@ -27,6 +27,7 @@ export async function POST(request: Request) {
     fromName,
     fromEmail,
     clickTracking = true,
+    clickTrackingMode = "append",
     openTracking = true,
     resendClickTracking = false,
     resendOpenTracking = false,
@@ -38,6 +39,7 @@ export async function POST(request: Request) {
     fromName?: string | null;
     fromEmail?: string | null;
     clickTracking?: boolean;
+    clickTrackingMode?: "append" | "redirect";
     openTracking?: boolean;
     resendClickTracking?: boolean;
     resendOpenTracking?: boolean;
@@ -241,22 +243,38 @@ export async function POST(request: Request) {
           });
           let personalHtml = personalHtml_;
 
-          // Click tracking — append sid (subscriber) and cid (campaign) params
-          // directly to each href. No redirect through /api/track/click. The
-          // recipient lands on the destination immediately; destination-side
-          // analytics read sid/cid for email attribution.
+          // Click tracking. Two modes:
+          //
+          // - "append" (default): sid (subscriber) + cid (campaign) appended
+          //   directly to each href. Recipient lands on the destination
+          //   immediately; destination-side analytics read sid/cid for email
+          //   attribution. No subscriber_events row written for clicks.
+          //
+          // - "redirect": sid/cid are still appended to the URL, then the
+          //   whole thing is wrapped in dp-email-2's /api/track/click redirect
+          //   so subscriber_events captures the click event before the user
+          //   bounces to the final destination. Destination beacons still see
+          //   sid/cid because they ride through the redirect's `u` param.
           if (clickTracking) {
             personalHtml = personalHtml.replace(/href=(["'])(https?:\/\/[^"']+)\1/g, (match, quote, url) => {
               if (url.includes("/unsubscribe")) return match;
+              let withParams: string;
               try {
                 const parsedUrl = new URL(url);
                 parsedUrl.searchParams.set("sid", sub.id);
                 parsedUrl.searchParams.set("cid", trackingCampaignId);
-                return `href=${quote}${parsedUrl.toString()}${quote}`;
+                withParams = parsedUrl.toString();
               } catch {
                 const sep = url.includes("?") ? "&" : "?";
-                return `href=${quote}${url}${sep}sid=${sub.id}&cid=${trackingCampaignId}${quote}`;
+                withParams = `${url}${sep}sid=${sub.id}&cid=${trackingCampaignId}`;
               }
+              if (clickTrackingMode === "redirect") {
+                const redirectUrl =
+                  `${baseUrl}/api/track/click?c=${encodeURIComponent(trackingCampaignId)}` +
+                  `&s=${encodeURIComponent(sub.id)}&u=${encodeURIComponent(withParams)}`;
+                return `href=${quote}${redirectUrl}${quote}`;
+              }
+              return `href=${quote}${withParams}${quote}`;
             });
           }
 

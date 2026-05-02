@@ -133,6 +133,30 @@ The agent flow for sending to a specific subscriber list:
 1. `POST /campaigns/{master_id}/clone` with `{"subscriber_ids": [...]}`.
 2. `POST /campaigns/{child_id}/send`.
 
+## Click tracking modes
+
+Both `POST /campaigns/{id}/send` and `POST /rotations/{id}/send` accept a
+`clickTrackingMode` field in the request body:
+
+- `"append"` (default): each `<a href>` in the email is rewritten to
+  include `sid` (subscriber id) and `cid` (campaign id) as query params.
+  The recipient lands on the destination immediately. **No click event is
+  written** to `subscriber_events`. Click attribution lives only on the
+  destination side, via `DpAnalyticsBeacon` posting to
+  `analytics_logs` on the analytics Supabase project.
+
+- `"redirect"`: hrefs are first rewritten to include sid/cid, then the
+  whole URL is wrapped in `https://email.dreamplaypianos.com/api/track/click?c=<cid>&s=<sid>&u=<encoded URL>`.
+  When the recipient clicks, dp-email-2's redirect endpoint inserts a row
+  into `subscriber_events` (`type: "click"`, `url: <destination>`), then
+  302s the user to the final destination. Destination beacons still see
+  sid/cid because they ride through the `u` param.
+
+Use `"redirect"` when you need click counts visible via
+`GET /campaigns/{id}/events?type=click` or via the dashboard's
+`total_clicks` column. Use `"append"` (default) when destination-side
+analytics_logs is sufficient and you'd rather avoid the extra hop.
+
 ## Safe Sending
 
 The Agent API refuses to send a campaign unless `variable_values` has one of:

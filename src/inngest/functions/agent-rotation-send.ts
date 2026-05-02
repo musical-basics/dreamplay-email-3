@@ -18,6 +18,7 @@ export const agentRotationSend = inngest.createFunction(
       fromName,
       fromEmail,
       clickTracking,
+      clickTrackingMode,
       openTracking,
       resendClickTracking,
       resendOpenTracking,
@@ -27,6 +28,7 @@ export const agentRotationSend = inngest.createFunction(
       fromName?: string | null;
       fromEmail?: string | null;
       clickTracking?: boolean;
+      clickTrackingMode?: "append" | "redirect";
       openTracking?: boolean;
       resendClickTracking?: boolean;
       resendOpenTracking?: boolean;
@@ -42,6 +44,7 @@ export const agentRotationSend = inngest.createFunction(
           fromName: fromName ?? null,
           fromEmail: fromEmail ?? null,
           clickTracking: clickTracking ?? true,
+          clickTrackingMode: clickTrackingMode ?? "append",
           openTracking: openTracking ?? true,
           resendClickTracking: resendClickTracking ?? false,
           resendOpenTracking: resendOpenTracking ?? false,

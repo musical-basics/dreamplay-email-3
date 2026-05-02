@@ -42,6 +42,7 @@ export async function POST(request: Request) {
     fromName,
     fromEmail,
     clickTracking = true,
+    clickTrackingMode = "append",
     openTracking = true,
     resendClickTracking = false,
     resendOpenTracking = false,
@@ -53,6 +54,7 @@ export async function POST(request: Request) {
     fromName?: string | null;
     fromEmail?: string | null;
     clickTracking?: boolean;
+    clickTrackingMode?: "append" | "redirect";
     openTracking?: boolean;
     resendClickTracking?: boolean;
     resendOpenTracking?: boolean;
@@ -193,6 +195,7 @@ export async function POST(request: Request) {
             fromName: fromName || template.variable_values?.from_name,
             fromEmail: fromEmail || template.variable_values?.from_email,
             clickTracking,
+            clickTrackingMode,
             openTracking,
             resendClickTracking,
             resendOpenTracking,

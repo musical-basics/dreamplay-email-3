@@ -358,7 +358,18 @@ async function handleCampaigns(request: Request, method: string, workspace: Work
 
       await dispatchCampaignSend({
         name: "agent.campaign.scheduled-send",
-        data: { campaignId, workspace, scheduledAt: parsed.data.scheduledAt },
+        data: {
+          campaignId,
+          workspace,
+          scheduledAt: parsed.data.scheduledAt,
+          fromName: parsed.data.fromName,
+          fromEmail: parsed.data.fromEmail,
+          clickTracking: parsed.data.clickTracking,
+          clickTrackingMode: parsed.data.clickTrackingMode,
+          openTracking: parsed.data.openTracking,
+          resendClickTracking: parsed.data.resendClickTracking,
+          resendOpenTracking: parsed.data.resendOpenTracking,
+        },
       });
 
       return json({ data: { success: true, scheduled: true, scheduledAt: parsed.data.scheduledAt } });
@@ -379,6 +390,7 @@ async function handleCampaigns(request: Request, method: string, workspace: Work
         fromName: parsed.data.fromName,
         fromEmail: parsed.data.fromEmail,
         clickTracking: parsed.data.clickTracking,
+        clickTrackingMode: parsed.data.clickTrackingMode,
         openTracking: parsed.data.openTracking,
         resendClickTracking: parsed.data.resendClickTracking,
         resendOpenTracking: parsed.data.resendOpenTracking,
@@ -896,6 +908,7 @@ async function handleRotations(request: Request, method: string, workspace: Work
       fromName: parsed.data.fromName,
       fromEmail: parsed.data.fromEmail,
       clickTracking: parsed.data.clickTracking,
+      clickTrackingMode: parsed.data.clickTrackingMode,
       openTracking: parsed.data.openTracking,
       resendClickTracking: parsed.data.resendClickTracking,
       resendOpenTracking: parsed.data.resendOpenTracking,
