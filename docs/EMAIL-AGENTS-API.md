@@ -38,7 +38,7 @@ Responses use an envelope:
 - `POST /campaigns/{id}/send`
 - `GET /campaigns/{id}/analytics`
 - `GET /campaigns/{id}/sent-history`
-- `GET /campaigns/{id}/events?type=open|click`
+- `GET /campaigns/{id}/events?type=open|click&filter=raw|human`
 - `GET /subscribers`
 - `GET /subscribers/{id}`
 - `GET /subscribers/{id}/history`
@@ -132,6 +132,42 @@ The agent flow for sending to a specific subscriber list:
 
 1. `POST /campaigns/{master_id}/clone` with `{"subscriber_ids": [...]}`.
 2. `POST /campaigns/{child_id}/send`.
+
+## Click events: scanner filtering
+
+`GET /campaigns/{id}/events?type=click&filter=human` returns the click
+events with email-security scanners and link unfurlers excluded. Two
+signals are applied:
+
+1. **User-Agent blocklist** — the `subscriber_events.user_agent` is
+   matched against a list of known scanner UA substrings (Microsoft
+   ATP Safe Links, Mimecast, Proofpoint, Slack/Discord/Twitter
+   unfurlers, etc.).
+2. **Time-from-sent** — events that arrive within 30 seconds of the
+   recipient's `sent_history.sent_at` are dropped. Real human clicks
+   on marketing email almost never happen that fast; almost all
+   sub-30s clicks are automated pre-fetches.
+
+The endpoint returns the cleaned set in `data` (paginated) and surfaces
+diagnostics in the response envelope:
+
+```json
+{
+  "data": [...],
+  "pagination": { "limit": 25, "offset": 0, "count": 6 },
+  "raw_count": 22,
+  "excluded": { "scanner_ua": 9, "too_fast": 7 }
+}
+```
+
+`filter=raw` (or omitting the param) returns every row, including
+scanners. Use `raw` when comparing to historical numbers; use `human`
+for actual engagement reads.
+
+The IP + User-Agent capture relies on a one-time Supabase migration
+(see `docs/migrations/2026-05-02-subscriber-events-ip-ua.sql`). Until
+that is run, `filter=human` falls back to the time-only filter and
+returns a `warning` field in the response.
 
 ## Click tracking modes
 

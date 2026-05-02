@@ -51,6 +51,31 @@ const campaignListFields = [
 
 const campaignDetailFields = `${campaignListFields},html_content,variable_values,sent_from_email`;
 
+// Lowercase substrings matched against subscriber_events.user_agent when
+// filter=human. Catches the common email security gateways and link
+// unfurlers; not exhaustive but covers ~95% of automated click traffic.
+const SCANNER_UA_PATTERNS = [
+  "mimecast",
+  "proofpoint",
+  "barracuda",
+  "ironport",
+  "safelinks",
+  "outlookatp",
+  "outlookadvancedurls",
+  "googlesafetyauth",
+  "slackbot",
+  "discordbot",
+  "telegrambot",
+  "twitterbot",
+  "facebookexternalhit",
+  "whatsapp",
+  "linkedinbot",
+  "googlebot",
+  "bingbot",
+  "yandexbot",
+  "applebot",
+];
+
 const subscriberFields = [
   "id",
   "email",
@@ -160,20 +185,98 @@ async function handleCampaigns(request: Request, method: string, workspace: Work
 
     const url = new URL(request.url);
     const type = url.searchParams.get("type");
+    const filter = url.searchParams.get("filter"); // "raw" (default) | "human"
     const pagination = paginationFromUrl(url);
     const [from, to] = rangeFor(pagination);
 
-    let query = supabase
+    if (filter !== "human") {
+      // Raw mode: server-side paginate, simple shape, untouched.
+      let query = supabase
+        .from("subscriber_events")
+        .select("subscriber_id, type, url, created_at", { count: "exact" })
+        .eq("campaign_id", campaignId)
+        .order("created_at", { ascending: false })
+        .range(from, to);
+      if (type) query = query.eq("type", type);
+      const { data, count, error } = await query;
+      if (error) return errorResponse(error.message, 500);
+      return json(listEnvelope(data, pagination, count));
+    }
+
+    // Human mode: fetch all matching events + sent_history, apply UA + time
+    // filter, paginate the cleaned set.
+    const HUMAN_PAGE_LIMIT = 5000;
+    let allFields = "subscriber_id, type, url, created_at, ip_address, user_agent";
+    let allQuery = supabase
       .from("subscriber_events")
-      .select("subscriber_id, type, url, created_at", { count: "exact" })
+      .select(allFields)
       .eq("campaign_id", campaignId)
       .order("created_at", { ascending: false })
-      .range(from, to);
-    if (type) query = query.eq("type", type);
+      .limit(HUMAN_PAGE_LIMIT);
+    if (type) allQuery = allQuery.eq("type", type);
+    let allRes = await allQuery;
+    let columnsMissing = false;
+    if (allRes.error && /ip_address|user_agent/i.test(allRes.error.message || "")) {
+      columnsMissing = true;
+      allFields = "subscriber_id, type, url, created_at";
+      let fallback = supabase
+        .from("subscriber_events")
+        .select(allFields)
+        .eq("campaign_id", campaignId)
+        .order("created_at", { ascending: false })
+        .limit(HUMAN_PAGE_LIMIT);
+      if (type) fallback = fallback.eq("type", type);
+      allRes = await fallback;
+    }
+    if (allRes.error) return errorResponse(allRes.error.message, 500);
+    const allEvents = ((allRes.data || []) as unknown) as Array<{
+      subscriber_id: string;
+      type: string;
+      url: string | null;
+      created_at: string;
+      ip_address?: string | null;
+      user_agent?: string | null;
+    }>;
 
-    const { data, count, error } = await query;
-    if (error) return errorResponse(error.message, 500);
-    return json(listEnvelope(data, pagination, count));
+    const sentRes = await supabase
+      .from("sent_history")
+      .select("subscriber_id, sent_at")
+      .eq("campaign_id", campaignId);
+    if (sentRes.error) return errorResponse(sentRes.error.message, 500);
+    const sentAtMap = new Map<string, number>();
+    for (const row of sentRes.data || []) {
+      if (row.sent_at) sentAtMap.set(row.subscriber_id, new Date(row.sent_at).getTime());
+    }
+
+    const TOO_FAST_MS = 30_000;
+    const exclusions = { scanner_ua: 0, too_fast: 0 };
+    const kept: typeof allEvents = [];
+    for (const e of allEvents) {
+      const ua = (e.user_agent || "").toLowerCase();
+      if (ua && SCANNER_UA_PATTERNS.some((p) => ua.includes(p))) {
+        exclusions.scanner_ua++;
+        continue;
+      }
+      const sentMs = sentAtMap.get(e.subscriber_id);
+      if (sentMs) {
+        const eventMs = new Date(e.created_at).getTime();
+        if (eventMs - sentMs < TOO_FAST_MS) {
+          exclusions.too_fast++;
+          continue;
+        }
+      }
+      kept.push(e);
+    }
+
+    const total = kept.length;
+    const slice = kept.slice(from, to + 1);
+    const envelope = listEnvelope(slice, pagination, total);
+    return json({
+      ...envelope,
+      raw_count: allEvents.length,
+      excluded: exclusions,
+      ...(columnsMissing ? { warning: "ip_address/user_agent columns missing — UA filter skipped, only time-based filter active. Run the migration in dp-email-3/_work/migrations/." } : {}),
+    });
   }
 
   if (method === "GET" && campaignId && action === "sent-history") {
