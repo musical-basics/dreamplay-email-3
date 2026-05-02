@@ -16,7 +16,7 @@ All list endpoints support:
 
 | Param | Default | Notes |
 | --- | --- | --- |
-| `limit` | `25` | Max `100` |
+| `limit` | `25` | Max `500` |
 | `offset` | `0` | Zero-based row offset |
 
 Responses use an envelope:

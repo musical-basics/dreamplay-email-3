@@ -7,7 +7,7 @@ export function paginationFromUrl(url: URL, defaults: Partial<Pagination> = {}):
   const rawLimit = Number(url.searchParams.get("limit") || defaults.limit || 25);
   const rawOffset = Number(url.searchParams.get("offset") || defaults.offset || 0);
 
-  const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 1), 100) : 25;
+  const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 1), 500) : 25;
   const offset = Number.isFinite(rawOffset) ? Math.max(Math.trunc(rawOffset), 0) : 0;
 
   return { limit, offset };
