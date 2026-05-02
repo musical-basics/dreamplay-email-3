@@ -193,7 +193,7 @@ async function handleCampaigns(request: Request, method: string, workspace: Work
       // Raw mode: server-side paginate, simple shape, untouched.
       let query = supabase
         .from("subscriber_events")
-        .select("subscriber_id, type, url, created_at", { count: "exact" })
+        .select("subscriber_id, type, url, created_at, ip_address, user_agent", { count: "exact" })
         .eq("campaign_id", campaignId)
         .order("created_at", { ascending: false })
         .range(from, to);
