@@ -8,6 +8,7 @@ import { workspaceSchema, type Workspace } from "@/src/lib/workspaces";
 import { generateCopilotEmail } from "@/src/ai/copilot";
 import {
   bulkCancelSchema,
+  bulkReactivateSchema,
   bulkTagSchema,
   bulkUntagSchema,
   campaignCreateSchema,
@@ -132,8 +133,9 @@ async function handleCampaigns(request: Request, method: string, workspace: Work
   const campaignId = path[1];
   const action = path[2];
 
-  // Bulk-cancel must be matched before the generic campaignId branches so the
-  // literal path /campaigns/bulk-cancel doesn't get treated as an id lookup.
+  // Bulk-cancel + bulk-reactivate must be matched before the generic
+  // campaignId branches so the literal paths /campaigns/bulk-cancel and
+  // /campaigns/bulk-reactivate don't get treated as id lookups.
   if (method === "POST" && campaignId === "bulk-cancel" && !action) {
     const body = await readJson(request);
     const parsed = bulkCancelSchema.safeParse(body);
@@ -159,6 +161,35 @@ async function handleCampaigns(request: Request, method: string, workspace: Work
         requested: parsed.data.campaign_ids.length,
         not_found: notFound,
         campaigns: cancelled,
+      },
+    });
+  }
+
+  if (method === "POST" && campaignId === "bulk-reactivate" && !action) {
+    const body = await readJson(request);
+    const parsed = bulkReactivateSchema.safeParse(body);
+    if (!parsed.success) return zodErrorResponse(parsed.error);
+
+    const { data, error } = await supabase
+      .from("campaigns")
+      .update({
+        scheduled_status: "pending",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("workspace", workspace)
+      .in("id", parsed.data.campaign_ids)
+      .select("id, status, scheduled_status, scheduled_at");
+
+    if (error) return errorResponse(error.message, 500);
+    const reactivated = data || [];
+    const reactivatedIds = new Set(reactivated.map((c) => c.id));
+    const notFound = parsed.data.campaign_ids.filter((id) => !reactivatedIds.has(id));
+    return json({
+      data: {
+        reactivated: reactivated.length,
+        requested: parsed.data.campaign_ids.length,
+        not_found: notFound,
+        campaigns: reactivated,
       },
     });
   }
@@ -584,6 +615,28 @@ async function handleCampaigns(request: Request, method: string, workspace: Work
       .from("campaigns")
       .update({
         scheduled_status: "cancelled",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("workspace", workspace)
+      .eq("id", campaignId)
+      .select("id, status, scheduled_status, scheduled_at")
+      .maybeSingle();
+
+    if (error) return errorResponse(error.message, 500);
+    if (!data) return errorResponse("Campaign not found", 404);
+    return json({ data });
+  }
+
+  if (method === "POST" && campaignId && action === "reactivate") {
+    // Reverses /cancel: flips scheduled_status back to "pending" so a
+    // future Inngest scheduled-send wake-up will proceed. Only meaningful
+    // if scheduled_at is still in the future and the function hasn't
+    // already woken+bailed; for past fires this is a no-op (the Inngest
+    // event has already completed). Safe to call regardless of state.
+    const { data, error } = await supabase
+      .from("campaigns")
+      .update({
+        scheduled_status: "pending",
         updated_at: new Date().toISOString(),
       })
       .eq("workspace", workspace)

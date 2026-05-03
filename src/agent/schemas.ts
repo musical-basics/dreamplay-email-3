@@ -26,9 +26,15 @@ export const campaignPatchSchema = campaignCreateSchema.partial().omit({ name: t
   name: z.string().min(1).optional(),
 });
 
-export const bulkCancelSchema = z.object({
+// Shared shape for bulk-cancel and bulk-reactivate. Both take the same
+// list of campaign ids; only the side-effect (set scheduled_status to
+// "cancelled" vs "pending") differs.
+export const bulkCampaignIdsSchema = z.object({
   campaign_ids: z.array(z.string().uuid()).min(1).max(100),
 });
+
+export const bulkCancelSchema = bulkCampaignIdsSchema;
+export const bulkReactivateSchema = bulkCampaignIdsSchema;
 
 export const cloneCampaignSchema = z.object({
   name: z.string().min(1).optional(),
