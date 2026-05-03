@@ -36,6 +36,8 @@ Responses use an envelope:
 - `PATCH /campaigns/{id}`
 - `POST /campaigns/{id}/clone`
 - `POST /campaigns/{id}/send`
+- `POST /campaigns/{id}/cancel` — sets `scheduled_status: "cancelled"` so the Inngest scheduled-send function bails on wake.
+- `POST /campaigns/bulk-cancel` — body `{ "campaign_ids": [...] }`. Bulk version of the above. Returns `{ cancelled, requested, not_found, campaigns }`.
 - `GET /campaigns/{id}/analytics`
 - `GET /campaigns/{id}/sent-history`
 - `GET /campaigns/{id}/events?type=open|click&filter=raw|human`

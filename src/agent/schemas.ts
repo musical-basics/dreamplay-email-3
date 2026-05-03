@@ -26,6 +26,10 @@ export const campaignPatchSchema = campaignCreateSchema.partial().omit({ name: t
   name: z.string().min(1).optional(),
 });
 
+export const bulkCancelSchema = z.object({
+  campaign_ids: z.array(z.string().uuid()).min(1).max(100),
+});
+
 export const cloneCampaignSchema = z.object({
   name: z.string().min(1).optional(),
   subscriber_ids: z.array(z.string().uuid()).optional(),

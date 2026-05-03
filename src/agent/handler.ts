@@ -7,6 +7,7 @@ import { listEnvelope, paginationFromUrl, rangeFor } from "@/src/lib/pagination"
 import { workspaceSchema, type Workspace } from "@/src/lib/workspaces";
 import { generateCopilotEmail } from "@/src/ai/copilot";
 import {
+  bulkCancelSchema,
   bulkTagSchema,
   bulkUntagSchema,
   campaignCreateSchema,
@@ -130,6 +131,37 @@ async function handleCampaigns(request: Request, method: string, workspace: Work
   const supabase = createAdminClient();
   const campaignId = path[1];
   const action = path[2];
+
+  // Bulk-cancel must be matched before the generic campaignId branches so the
+  // literal path /campaigns/bulk-cancel doesn't get treated as an id lookup.
+  if (method === "POST" && campaignId === "bulk-cancel" && !action) {
+    const body = await readJson(request);
+    const parsed = bulkCancelSchema.safeParse(body);
+    if (!parsed.success) return zodErrorResponse(parsed.error);
+
+    const { data, error } = await supabase
+      .from("campaigns")
+      .update({
+        scheduled_status: "cancelled",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("workspace", workspace)
+      .in("id", parsed.data.campaign_ids)
+      .select("id, status, scheduled_status, scheduled_at");
+
+    if (error) return errorResponse(error.message, 500);
+    const cancelled = data || [];
+    const cancelledIds = new Set(cancelled.map((c) => c.id));
+    const notFound = parsed.data.campaign_ids.filter((id) => !cancelledIds.has(id));
+    return json({
+      data: {
+        cancelled: cancelled.length,
+        requested: parsed.data.campaign_ids.length,
+        not_found: notFound,
+        campaigns: cancelled,
+      },
+    });
+  }
 
   if (method === "GET" && !campaignId) {
     const url = new URL(request.url);
@@ -541,6 +573,27 @@ async function handleCampaigns(request: Request, method: string, workspace: Work
     });
 
     return json({ data: { success: true, scheduled: false } });
+  }
+
+  if (method === "POST" && campaignId && action === "cancel") {
+    // Marks the campaign as cancelled so the corresponding Inngest
+    // scheduled-send function bails when it wakes up
+    // (it checks scheduled_status === "cancelled"). Safe to call on a
+    // campaign that's already completed; this just sets the field.
+    const { data, error } = await supabase
+      .from("campaigns")
+      .update({
+        scheduled_status: "cancelled",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("workspace", workspace)
+      .eq("id", campaignId)
+      .select("id, status, scheduled_status, scheduled_at")
+      .maybeSingle();
+
+    if (error) return errorResponse(error.message, 500);
+    if (!data) return errorResponse("Campaign not found", 404);
+    return json({ data });
   }
 
   return errorResponse("Campaign endpoint not found", 404);
