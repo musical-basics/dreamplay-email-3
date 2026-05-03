@@ -369,7 +369,11 @@ export async function POST(request: Request) {
         }
 
         if (ri < recipients.length - 1) {
-          await new Promise((r) => setTimeout(r, 600));
+          // 100ms = 10 req/s, matching Resend's default rate limit. The
+          // previous 600ms throttle made any batch >= ~430 recipients
+          // exceed Vercel's 300s maxDuration before the post-loop
+          // sent_history insert and status update could run.
+          await new Promise((r) => setTimeout(r, 100));
         }
       }
 
