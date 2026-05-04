@@ -215,6 +215,16 @@ export async function POST(request: Request) {
 
       log("info", `Found ${recipients.length} recipient(s)`, { total: recipients.length });
 
+      if (clickTracking && clickTrackingMode === "redirect") {
+        log(
+          "warn",
+          `clickTrackingMode="redirect" requested. WARNING: for bulk sends, click redirects will trigger Gmail bulk-flagging. ` +
+            `Observed on the 2026-05-03 overnight run (slots 6-10, ~2,000 recipients) where Gmail open rates collapsed from ~42% to <2% after a few cadenced batches with redirect mode on. ` +
+            `Use the default append mode unless you specifically need server-side click capture on a small send.`,
+          { clickTrackingMode, recipientCount: recipients.length }
+        );
+      }
+
       // Tracking host is picked per-send to align with the From email's
       // domain. Mismatch between the visible From and embedded link domain
       // is a strong phishing signal for mailbox providers (Gmail, Outlook,
