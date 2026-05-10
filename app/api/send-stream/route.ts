@@ -379,11 +379,18 @@ export async function POST(request: Request) {
         }
 
         if (ri < recipients.length - 1) {
-          // 100ms = 10 req/s, matching Resend's default rate limit. The
-          // previous 600ms throttle made any batch >= ~430 recipients
-          // exceed Vercel's 300s maxDuration before the post-loop
-          // sent_history insert and status update could run.
-          await new Promise((r) => setTimeout(r, 100));
+          // 200ms = 5 req/s, matching the actual Resend rate limit on
+          // this account (verified 2026-05-09 from a 429 error
+          // response: "you can only make 5 requests per second").
+          // A single send-stream invocation now fully respects the
+          // limit on its own. Multiple concurrent invocations are
+          // prevented at the Inngest layer via the shared
+          // global-send-lock concurrency config across the four send
+          // functions; this throttle is the second line of defense.
+          // For a 500-recipient batch, total wall-clock is now
+          // ~100s + Resend latency, still well under the 300s
+          // Vercel maxDuration.
+          await new Promise((r) => setTimeout(r, 200));
         }
       }
 

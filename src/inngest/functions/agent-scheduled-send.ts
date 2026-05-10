@@ -11,7 +11,21 @@ const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dreamplay-email-3.ve
  * separate event namespace.
  */
 export const agentScheduledSend = inngest.createFunction(
-  { id: "agent-scheduled-campaign-send" },
+  {
+    id: "agent-scheduled-campaign-send",
+    // Resend rate-limit is 5 req/s on this account. If multiple send
+    // functions run in parallel they collectively exceed it and emails
+    // start failing with 429s. Concurrency limit 1, scope "account",
+    // shared CEL key — all four send-related Inngest functions
+    // (agent-send, agent-scheduled-send, agent-rotation-send,
+    // agent-rotation-scheduled-send) reference the same key, so at most
+    // ONE of them can be executing at any time across the entire
+    // account. Functions queued behind the holder run sequentially when
+    // the slot frees up.
+    concurrency: [
+      { key: "'global-send-lock'", limit: 1, scope: "account" },
+    ],
+  },
   { event: "agent.campaign.scheduled-send" },
   async ({ event, step }) => {
     const {
