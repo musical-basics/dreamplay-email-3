@@ -11,7 +11,14 @@ const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dreamplay-email-3.ve
  * then calls /api/send-rotation. Mirrors agent-scheduled-send for campaigns.
  */
 export const agentRotationScheduledSend = inngest.createFunction(
-  { id: "agent-rotation-scheduled-send" },
+  {
+    id: "agent-rotation-scheduled-send",
+    // Shared concurrency lock with the other three send-related Inngest
+    // functions. See agent-scheduled-send.ts for the full reasoning.
+    concurrency: [
+      { key: "'global-send-lock'", limit: 1, scope: "account" },
+    ],
+  },
   { event: "agent.rotation.scheduled-send" },
   async ({ event, step }) => {
     const {

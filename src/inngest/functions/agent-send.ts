@@ -12,7 +12,14 @@ const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dreamplay-email-3.ve
  * Acts as a thin Inngest wrapper around /api/send-stream.
  */
 export const agentSend = inngest.createFunction(
-  { id: "agent-send" },
+  {
+    id: "agent-send",
+    // Shared concurrency lock with the other three send-related Inngest
+    // functions. See agent-scheduled-send.ts for the full reasoning.
+    concurrency: [
+      { key: "'global-send-lock'", limit: 1, scope: "account" },
+    ],
+  },
   { event: "agent.campaign.send" },
   async ({ event, step }) => {
     const {
