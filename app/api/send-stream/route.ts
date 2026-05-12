@@ -215,6 +215,50 @@ export async function POST(request: Request) {
 
       log("info", `Found ${recipients.length} recipient(s)`, { total: recipients.length });
 
+      // Idempotency guard. Skip any recipient that already has a
+      // sent_history row for this campaign. Without this, an Inngest
+      // retry of the send-broadcast step (e.g., when the first run
+      // hits Vercel's maxDuration or the upstream HTTP timeout) will
+      // re-execute the entire loop and send every recipient a second
+      // copy. Observed in the 2026-05-12 250 Gmail child where every
+      // recipient received the email twice ~30s apart.
+      const totalCandidates = recipients.length;
+      const candidateIds = recipients.map((r) => r.id as string);
+      const { data: alreadySentRows, error: alreadySentError } = await supabaseAdmin
+        .from("sent_history")
+        .select("subscriber_id")
+        .eq("campaign_id", trackingCampaignId)
+        .in("subscriber_id", candidateIds);
+      if (alreadySentError) {
+        log("error", `Idempotency check failed: ${alreadySentError.message}. Aborting to avoid double-send.`);
+        ctrl.close();
+        return;
+      }
+      const alreadySent = new Set((alreadySentRows ?? []).map((r) => r.subscriber_id as string));
+      const recipientsToSend = recipients.filter((r) => !alreadySent.has(r.id as string));
+      if (alreadySent.size > 0) {
+        log(
+          "warn",
+          `Idempotency filter: ${alreadySent.size} of ${totalCandidates} recipient(s) already in sent_history for this campaign; skipping. Likely cause: retry of a partially or fully completed earlier run.`,
+          { alreadySent: alreadySent.size, willSend: recipientsToSend.length, totalCandidates }
+        );
+      }
+      if (recipientsToSend.length === 0) {
+        const message = `All ${totalCandidates} recipient(s) already sent. Idempotent no-op.`;
+        log("success", message, {
+          done: true,
+          stats: { sent: 0, failed: 0, total: 0, skippedAlreadySent: alreadySent.size },
+          message,
+        });
+        await supabaseAdmin
+          .from("campaigns")
+          .update({ status: "completed", updated_at: new Date().toISOString() })
+          .eq("id", trackingCampaignId);
+        await persistLogs();
+        ctrl.close();
+        return;
+      }
+
       if (clickTracking && clickTrackingMode === "redirect") {
         log(
           "warn",
@@ -270,11 +314,10 @@ export async function POST(request: Request) {
       let successCount = 0;
       let failureCount = 0;
       let firstResendEmailId: string | null = null;
-      const sentRecords: Array<Record<string, unknown>> = [];
 
-      for (let ri = 0; ri < recipients.length; ri++) {
-        const sub = recipients[ri];
-        const progress = `[${ri + 1}/${recipients.length}]`;
+      for (let ri = 0; ri < recipientsToSend.length; ri++) {
+        const sub = recipientsToSend[ri];
+        const progress = `[${ri + 1}/${recipientsToSend.length}]`;
 
         try {
           log("info", `${progress} Processing ${sub.email}...`);
@@ -365,20 +408,28 @@ export async function POST(request: Request) {
             if (!firstResendEmailId && sendData?.id) {
               firstResendEmailId = sendData.id;
             }
-            sentRecords.push({
+            // Record sent_history immediately so the idempotency guard
+            // at the top of this route can see this send if the
+            // function gets retried. Previously this was batched at
+            // the end of the loop; a mid-loop crash would drop every
+            // already-sent row and the retry would re-send everyone.
+            const { error: historyError } = await supabaseAdmin.from("sent_history").insert({
               campaign_id: trackingCampaignId,
               subscriber_id: sub.id,
               sent_at: new Date().toISOString(),
               variant_sent: campaign.subject_line || null,
               merge_tag_log: mergeTagLog,
             });
+            if (historyError) {
+              log("warn", `Failed to insert sent_history for ${sub.email}: ${historyError.message}`);
+            }
           }
         } catch (e) {
           log("error", `${progress} Unexpected error for ${sub.email}: ${e instanceof Error ? e.message : String(e)}`);
           failureCount++;
         }
 
-        if (ri < recipients.length - 1) {
+        if (ri < recipientsToSend.length - 1) {
           // 200ms = 5 req/s, matching the actual Resend rate limit on
           // this account (verified 2026-05-09 from a 429 error
           // response: "you can only make 5 requests per second").
@@ -394,15 +445,8 @@ export async function POST(request: Request) {
         }
       }
 
-      if (sentRecords.length > 0) {
-        log("info", `Inserting ${sentRecords.length} history record(s)...`);
-        const { error: historyError } = await supabaseAdmin.from("sent_history").insert(sentRecords);
-        if (historyError) {
-          log("warn", `Failed to insert history: ${historyError.message}`);
-        } else {
-          log("success", "History records saved");
-        }
-      }
+      // sent_history is written per-recipient inside the loop above.
+      // Nothing to batch-insert here.
 
       const updateData: Record<string, unknown> = {
         status: "completed",
@@ -410,16 +454,24 @@ export async function POST(request: Request) {
         // total_recipients is what the dp-email-2 dashboard reads to compute
         // openRate = total_opens / total_recipients. Without this update,
         // the Open Rate / Click Rate columns render "—" for every send.
-        total_recipients: successCount,
-        total_audience_size: recipients.length,
+        // Counts reflect the original audience (totalCandidates), not the
+        // post-idempotency-filter slice, so the dashboard percentages
+        // stay accurate across partial-retry scenarios.
+        total_recipients: successCount + alreadySent.size,
+        total_audience_size: totalCandidates,
       };
       if (firstResendEmailId) updateData.resend_email_id = firstResendEmailId;
       await supabaseAdmin.from("campaigns").update(updateData).eq("id", trackingCampaignId);
 
-      const summaryMessage = `Broadcast complete: ${successCount} sent, ${failureCount} failed of ${recipients.length}.`;
+      const summaryMessage = `Broadcast complete: ${successCount} sent, ${failureCount} failed, ${alreadySent.size} skipped (already sent) of ${totalCandidates}.`;
       log("success", summaryMessage, {
         done: true,
-        stats: { sent: successCount, failed: failureCount, total: recipients.length },
+        stats: {
+          sent: successCount,
+          failed: failureCount,
+          skippedAlreadySent: alreadySent.size,
+          total: totalCandidates,
+        },
         message: summaryMessage,
       });
     } catch (err) {
