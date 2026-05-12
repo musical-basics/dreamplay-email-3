@@ -39,6 +39,7 @@ export async function POST(request: Request) {
   const {
     rotationId,
     subscriberIds,
+    sendKey,
     fromName,
     fromEmail,
     clickTracking = true,
@@ -51,6 +52,16 @@ export async function POST(request: Request) {
   } = body as {
     rotationId: string;
     subscriberIds: string[];
+    // Idempotency key from the caller. The caller (Inngest function)
+    // generates this once per invocation inside its own step.run so it
+    // survives step retries. We stamp it into each child campaign's
+    // variable_values.send_key and look children up by it. A retry of
+    // this endpoint with the same sendKey reuses the children created
+    // by the first attempt instead of creating a fresh set with new
+    // UUIDs (which would all bypass send-stream's per-campaign
+    // idempotency check). Legacy callers that don't pass a sendKey
+    // get the old non-idempotent behavior with a logged warning.
+    sendKey?: string;
     fromName?: string | null;
     fromEmail?: string | null;
     clickTracking?: boolean;
@@ -149,6 +160,14 @@ export async function POST(request: Request) {
       let totalSent = 0;
       let totalFailed = 0;
       const totalRecipients = subscribers.length;
+      let anyNewChildCreated = false;
+
+      if (!sendKey) {
+        log(
+          "warn",
+          "No sendKey provided. Child campaign creation is NOT idempotent for this invocation; an Inngest retry will create a duplicate set of children and double-send. Update the caller to pass a stable sendKey."
+        );
+      }
 
       for (const [templateId, batchSubscriberIds] of Object.entries(grouped)) {
         const template = templateMap[templateId];
@@ -156,41 +175,74 @@ export async function POST(request: Request) {
 
         log("info", `--- Batch: "${template.name}" (${batchSubscriberIds.length} recipients) ---`);
 
-        const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-        const { data: child, error: childError } = await supabaseAdmin
-          .from("campaigns")
-          .insert({
-            name: `${template.name} (Rotation ${today})`,
-            subject_line: template.subject_line,
-            html_content: template.html_content,
-            status: "draft",
-            is_template: false,
-            parent_template_id: templateId,
-            rotation_id: rotationId,
-            workspace: template.workspace,
-            email_type: template.email_type || "campaign",
-            variable_values: (() => {
-              const sourceVars = (template.variable_values || {}) as Record<string, unknown>;
-              const { subscriber_id: _drop1, subscriber_ids: _drop2, ...rest } = sourceVars;
-              return rest;
-            })(),
-          })
-          .select("id")
-          .single();
+        let childId: string | null = null;
 
-        if (childError || !child) {
-          log("error", `Failed to create child campaign for "${template.name}": ${childError?.message}`);
-          totalFailed += batchSubscriberIds.length;
-          continue;
+        if (sendKey) {
+          // .limit(1) instead of .maybeSingle() so a rare race that
+          // produced two children for the same key (e.g., a transient
+          // lookup error caused fall-through-to-create on the first
+          // run, then the retry found both) doesn't error out — we
+          // just pick the oldest one and reuse it. Any extra child is
+          // harmless: send-stream's per-campaign idempotency check
+          // means a second send-stream call against the orphan still
+          // skips every already-sent recipient.
+          const { data: existingRows, error: existingError } = await supabaseAdmin
+            .from("campaigns")
+            .select("id")
+            .eq("rotation_id", rotationId)
+            .eq("parent_template_id", templateId)
+            .eq("variable_values->>send_key", sendKey)
+            .order("created_at", { ascending: true })
+            .limit(1);
+          if (existingError) {
+            log("warn", `Failed to look up existing child for "${template.name}" by sendKey: ${existingError.message}. Falling through to create.`);
+          } else if (existingRows && existingRows.length > 0) {
+            childId = existingRows[0].id as string;
+            log("info", `Reusing existing child ${childId} for sendKey=${sendKey} (retry detected).`);
+          }
         }
 
-        log("info", `Created child campaign ${child.id}, calling send-stream...`);
+        if (!childId) {
+          const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+          const { data: child, error: childError } = await supabaseAdmin
+            .from("campaigns")
+            .insert({
+              name: `${template.name} (Rotation ${today})`,
+              subject_line: template.subject_line,
+              html_content: template.html_content,
+              status: "draft",
+              is_template: false,
+              parent_template_id: templateId,
+              rotation_id: rotationId,
+              workspace: template.workspace,
+              email_type: template.email_type || "campaign",
+              variable_values: (() => {
+                const sourceVars = (template.variable_values || {}) as Record<string, unknown>;
+                const { subscriber_id: _drop1, subscriber_ids: _drop2, ...rest } = sourceVars;
+                if (sendKey) (rest as Record<string, unknown>).send_key = sendKey;
+                return rest;
+              })(),
+            })
+            .select("id")
+            .single();
+
+          if (childError || !child) {
+            log("error", `Failed to create child campaign for "${template.name}": ${childError?.message}`);
+            totalFailed += batchSubscriberIds.length;
+            continue;
+          }
+          childId = child.id as string;
+          anyNewChildCreated = true;
+          log("info", `Created child campaign ${childId}, calling send-stream...`);
+        } else {
+          log("info", `Calling send-stream with existing child ${childId}...`);
+        }
 
         const response = await fetch(`${baseUrl}/api/send-stream`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            campaignId: child.id,
+            campaignId: childId,
             overrideSubscriberIds: batchSubscriberIds,
             fromName: fromName || template.variable_values?.from_name,
             fromEmail: fromEmail || template.variable_values?.from_email,
@@ -219,11 +271,24 @@ export async function POST(request: Request) {
         log("info", `Batch "${template.name}" done: ${batchSent} sent, ${batchFailed} failed`);
       }
 
-      const newCursor = ((rotation.cursor_position ?? 0) + subscribers.length) % totalCampaigns;
-      await supabaseAdmin
-        .from("rotations")
-        .update({ cursor_position: newCursor, updated_at: new Date().toISOString() })
-        .eq("id", rotationId);
+      // Only advance the cursor if this invocation actually created at
+      // least one new child. If every child was reused, this is a
+      // retry of an earlier completed (or partially completed) run —
+      // either the original run already advanced the cursor, or it
+      // crashed before it had a chance to and the next legitimate
+      // rotation send will advance from the same position. Advancing
+      // here on every retry would shift the rotation forward by
+      // subscribers.length each time, throwing off the round-robin
+      // assignment for all subsequent sends.
+      if (anyNewChildCreated) {
+        const newCursor = ((rotation.cursor_position ?? 0) + subscribers.length) % totalCampaigns;
+        await supabaseAdmin
+          .from("rotations")
+          .update({ cursor_position: newCursor, updated_at: new Date().toISOString() })
+          .eq("id", rotationId);
+      } else {
+        log("info", "All children were reused from a prior run — skipping cursor advance.");
+      }
 
       const summary = `Rotation send complete: ${totalSent} sent, ${totalFailed} failed of ${totalRecipients}.`;
       log("success", summary, {

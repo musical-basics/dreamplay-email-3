@@ -68,6 +68,15 @@ export const agentRotationScheduledSend = inngest.createFunction(
       return { message: "Rotation already sent", rotationId };
     }
 
+    // Generate the idempotency key in its own step so Inngest memoizes
+    // it. On a retry of send-rotation below, this step returns the same
+    // value, the endpoint sees the same sendKey, and looks up the
+    // children created on the first attempt instead of creating a new
+    // set with fresh UUIDs.
+    const sendKey = await step.run("generate-send-key", async () => {
+      return crypto.randomUUID();
+    });
+
     const result = await step.run("send-rotation", async () => {
       const response = await fetch(`${baseUrl}/api/send-rotation`, {
         method: "POST",
@@ -75,6 +84,7 @@ export const agentRotationScheduledSend = inngest.createFunction(
         body: JSON.stringify({
           rotationId,
           subscriberIds,
+          sendKey,
           fromName: fromName ?? null,
           fromEmail: fromEmail ?? null,
           clickTracking: clickTracking ?? true,

@@ -41,6 +41,14 @@ export const agentRotationSend = inngest.createFunction(
       resendOpenTracking?: boolean;
     };
 
+    // See agent-rotation-scheduled-send.ts for the full reasoning.
+    // Memoizing sendKey in its own step ensures a retry of send-rotation
+    // below sees the same key and reuses the children from the first
+    // attempt instead of creating a duplicate set.
+    const sendKey = await step.run("generate-send-key", async () => {
+      return crypto.randomUUID();
+    });
+
     const result = await step.run("send-rotation", async () => {
       const response = await fetch(`${baseUrl}/api/send-rotation`, {
         method: "POST",
@@ -48,6 +56,7 @@ export const agentRotationSend = inngest.createFunction(
         body: JSON.stringify({
           rotationId,
           subscriberIds,
+          sendKey,
           fromName: fromName ?? null,
           fromEmail: fromEmail ?? null,
           clickTracking: clickTracking ?? true,
