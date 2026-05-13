@@ -15,6 +15,48 @@ entry shows the audit happened.
 
 ---
 
+## 2026-05-13 early morning — 250 Gmail + 250 non-Gmail Variant B
+
+**Planned**: 250 Gmail + 250 non-Gmail of Variant B parent template `db10a687-4233-4313-8431-8d2fa64a15c4` (subject "My upcoming concert and livestream"), sender `Lionel Yu <lionel@musicalbasics.com>`, append-mode click tracking, scheduled `2026-05-13T09:50:00Z` (Gmail child `a42899e3-6e81-4c3d-8058-aaa2b9fe3612`) / `2026-05-13T09:55:00Z` (non-Gmail child `f4bb8497-9428-4718-abfc-1127806428dc`). Third 250/250 send in the Variant B follow-up sequence.
+
+**Audit at**: `2026-05-13T08:46Z`, ~1h before the planned fire.
+
+**Verdict**: `SAFE` on the first pass. No blockers caught.
+
+### Section-by-section findings
+
+| Section | Verdict | Detail |
+|---|---|---|
+| A. Idempotency | PASS | `sent_history` filter pre-loop ([send-stream/route.ts:227-245](../app/api/send-stream/route.ts#L227)); per-recipient insert in loop :416-425; early-bail no-op at :246-260 preserves campaign stats on retry |
+| B. Throttle headroom | PASS | 200ms throttle ([send-stream/route.ts:444](../app/api/send-stream/route.ts#L444)); `maxDuration=300` at :10. 250 × ~900ms ≈ 225s. Margin: 75s |
+| C. Concurrency lock | PASS | All four agent-*.ts functions share `{ key: "'global-send-lock'", limit: 1, scope: "account" }` |
+| D. DB UNIQUE constraint | PASS | Applied and verified earlier this session via duplicate-INSERT probe (`23505 duplicate key value violates unique constraint`) |
+| E. Audience query | PASS | [schedule-250-250.ts](../_work/schedule-250-250.ts) excludes Test Account + done-belgium-followup-b; 250-cap slice via shuffle |
+| E2. scheduledAt freshness | PASS | Current 08:46Z, planned 09:50Z (T+63m) / 09:55Z (T+68m). Both in the future, ~1h lead as intended, 5-min stagger preserved |
+| F. Rotation safety | PASS | Not exercised. sendKey lookup path verified |
+| G. State guards | PASS | cancelled / sent early returns + scheduled_status flip after send |
+
+### Blockers caught and fixed before send
+
+None this run. The previous audit (2026-05-12 evening) caught a stale `scheduledAt` issue and pushed the auditor to check it as a top-level section (E2); E2 is now a routine PASS because the scheduler script was updated to fresh values before the audit ran.
+
+### Deferred / accepted risks
+
+- Stale doc-comment in `_work/schedule-250-250.ts:1-10` referencing "600ms throttle, no concurrency lock" — code is current, comment is not. Cosmetic only; flagged for cleanup after the send.
+- Throttle headroom (75s) is comfortable but not enormous. If Resend p99 latency spikes past ~1000ms per call, a 250-recipient run could brush the 300s ceiling. Watch for retries in Inngest dashboard after the fire.
+
+### Outcome
+
+TBD — children fire at 09:50Z / 09:55Z. Stats and Gmail-only honest figures will be appended after the send matures.
+
+### Lessons recorded
+
+None new this run. The audit ran clean against the post-incident
+codebase, which is the point of the audit log: zero-finding entries
+confirm the protections continue to hold.
+
+---
+
 ## 2026-05-12 evening — 250 Gmail + 250 non-Gmail Variant B
 
 **Planned**: 250 Gmail + 250 non-Gmail recipients of Variant B parent
