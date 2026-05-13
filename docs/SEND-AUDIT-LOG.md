@@ -58,10 +58,39 @@ Both children fired on time and completed cleanly:
 - Gmail child `9624a5ac-c3d7-4ed8-9072-6b1e4999217d`: 250 `sent_history` rows for 250 unique subscribers. No duplicates.
 - non-Gmail child `fa037da1-bb49-49c6-a0a9-f0d30a027eb1`: 250 rows for 250 subscribers. No duplicates.
 
-At 4h50m elapsed: 27.2% raw open rate, 21.6% unique, 10 clicks, 0 unsubs. Healthy.
+**Honest metrics (Gmail-only; see Lessons below for why):**
+
+| Metric | At ~5h | Comparable to last night (24.7h mature) |
+|---|---:|---:|
+| Gmail open rate | 22.0% | 30.0% |
+| Gmail click rate | 0.8% | 0.8% |
+
+**Headline (mixed-provider) metrics, retained for reference but not engagement signal:**
+
+- Raw open rate: 27.2%, unique 21.6%
+- Raw click rate: 2.0% (10 clicks across 500 recipients)
+- 0 unsubs
+
+The headline figures are inflated by Apple Mail Privacy Protection
+opens (iCloud / Apple Mail prefetch every image on delivery, firing
+the open pixel; ~85% mature rate, ~0% click rate) and by corporate
+URL-safety scanners on `.edu` / `.gov` / law-firm / medical-org
+domains (which click every link in every email within seconds of
+delivery). 100% of click events from "Other"-bucket domains across
+both 2026-05-12 sends fired within 5 minutes of send, often 2-3
+clicks per recipient on a single-link email. **Real human click
+count for this 500-recipient send is approximately 4** (2 Gmail
++ 1 Microsoft + 1 Yahoo), not the 10 the raw number suggests.
 
 ### Lessons recorded
 
 - **Always re-check hardcoded `scheduledAt` values in scheduler scripts before re-running.** The previous run's constants persist as a footgun. Consider deriving `scheduledAt` from `Date.now() + offsetMinutes` in the script, with the offset passed as an argument or env var, so the values can't go stale.
 - **The auditor should explicitly include time-of-fire validation as a check.** Currently it's caught as a sub-bullet of "audience / scheduler" but it's a distinct failure mode that deserves its own line. Update the auditor prompt next pass.
 - **The DB UNIQUE constraint probe script ([_work/verify-unique-constraint.ts](../_work/verify-unique-constraint.ts)) is reusable.** Run it any time the migration status is in doubt. It does a single duplicate INSERT against an existing row and reports the response code.
+- **Total open/click rates are noise. Lead with Gmail-only.** Verified on 2026-05-12 by breaking down opens and clicks by email-provider domain ([_work/check-opens-by-provider.ts](../_work/check-opens-by-provider.ts), [_work/check-other-domain-clicks.ts](../_work/check-other-domain-clicks.ts)). Findings:
+  - Apple iCloud open rate runs 60-86% with ~0% click rate. Apple Mail Privacy Protection prefetches every image on delivery; the open pixel is fired by a privacy proxy, not a human.
+  - Yahoo and AOL open rates also heavily prefetched (50-85%).
+  - 100% of clicks from "Other"-bucket domains (`.edu`, `.gov`, law firms, medical, corporate) on 2026-05-12 fired within 5 minutes of send, often 2-3 clicks per recipient. These are inbound URL-safety scanners (Mimecast, Proofpoint, Microsoft SafeLinks, etc.) — not humans.
+  - **Gmail metrics are the only reliable engagement signal.** Gmail's image proxy doesn't pre-fetch; Gmail tabs don't pre-click. Stable Gmail open rate ~30%, Gmail click rate ~0.8% on this audience.
+  - Apple click rate, when non-zero, is also a real human signal (MPP doesn't follow links) but the sample is tiny.
+  - When comparing subject lines or sends, only compare Gmail rates. Non-Gmail rates measure scanner aggressiveness, not human interest.
