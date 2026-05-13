@@ -61,6 +61,16 @@ Locate the user's `_work/schedule-*.ts` script. Verify:
 - [ ] Are test accounts (`tags.includes("Test Account")`) excluded?
 - [ ] Is the script idempotent — if I ran it twice, would it create two children with two scheduled fires? (The two children would each have unique campaign IDs, so the send-stream idempotency check doesn't help across them.)
 
+### E2. `scheduledAt` freshness
+
+Scheduler scripts in `_work/schedule-*.ts` often hardcode `scheduledAt` UTC strings. These persist as footguns between runs.
+
+- [ ] Run `date -u` to get the current time. Compare to the `scheduledAt` constants in the script.
+- [ ] Are all `scheduledAt` values in the future? `step.sleepUntil` with a past `Date` fires immediately, which causes children to fire back-to-back at run time instead of at the intended slot — and may also collapse the cadence stagger.
+- [ ] Are the values consistent with what the user said? If they said "1 hour from now," the value should be roughly `now + 60min`, not the same constant from the previous run.
+
+This was the blocker caught on the 2026-05-12 evening send — the script still had `2026-05-12T02:25:00Z` from the prior night. See [docs/SEND-AUDIT-LOG.md](../../docs/SEND-AUDIT-LOG.md).
+
 ### F. Cross-child rotation safety (for `/api/send-rotation` only)
 
 - [ ] Does the rotation endpoint create new child campaign UUIDs on each invocation? If so, an Inngest retry of `step.run("send-rotation", ...)` will create a second set of children, each with their own send — and the per-campaign idempotency check in send-stream won't catch this because the duplicates have different `campaign_id`s. This is a latent risk noted in `docs/INCIDENT-2026-05-12-gmail-double-send.md`.
@@ -96,6 +106,7 @@ Findings:
   C. Concurrency lock:   PASS | FAIL | N/A — <one-line reason with file:line>
   D. DB UNIQUE constraint: PASS | FAIL | UNKNOWN — <one-line reason>
   E. Audience query:     PASS | FAIL | N/A — <one-line reason with file:line>
+  E2. scheduledAt fresh: PASS | FAIL | N/A — <one-line reason with current time vs. scheduledAt>
   F. Rotation safety:    PASS | FAIL | N/A — <one-line reason>
   G. State guards:       PASS | FAIL | N/A — <one-line reason with file:line>
 
@@ -105,6 +116,8 @@ If UNSAFE, blocking issues:
 
 Confidence: <high|medium|low> — <one-line caveat about anything you couldn't verify>
 ```
+
+After the audit and the send, the parent agent should record the audit + outcome in [docs/SEND-AUDIT-LOG.md](../../docs/SEND-AUDIT-LOG.md). Newest entry at top.
 
 Be concise. The parent agent and the user have already read the code many times; they need findings, not a tutorial.
 
