@@ -15,6 +15,33 @@ entry shows the audit happened.
 
 ---
 
+## 2026-05-13 afternoon — 250 Gmail + 250 non-Gmail Variant B (Send 4)
+
+**Planned**: 250 Gmail + 250 non-Gmail of Variant B parent template `db10a687-...`, scheduled `2026-05-13T18:50:00Z` (Gmail child `3ac3194f-6d16-4a7b-99f5-664ab919bd94`) / `2026-05-13T18:55:00Z` (non-Gmail child `6f7568be-c7e1-4170-963c-78f54d09e9db`). Eligible pool dropping: 2,978 → 2,478 after this send.
+
+**Audit at**: `2026-05-13T17:46Z`, ~1h before fire.
+
+**Verdict**: `SAFE`. No findings, no blockers.
+
+| Section | Verdict | Detail |
+|---|---|---|
+| A. Idempotency | PASS | [send-stream/route.ts:227-260](../app/api/send-stream/route.ts#L227), :416-422 |
+| B. Throttle headroom | PASS | 250 × ~900ms ≈ 225s vs 300s maxDuration |
+| C. Concurrency lock | PASS | All 4 functions share `global-send-lock` |
+| D. DB UNIQUE constraint | PASS | Applied and verified |
+| E. Audience query | PASS | [schedule-250-250.ts:88-107](../_work/schedule-250-250.ts) |
+| E2. scheduledAt freshness | PASS | now 17:46Z, Gmail T+63m, non-Gmail T+68m |
+| F. Rotation safety | PASS | Not exercised |
+| G. State guards | PASS | cancelled/sent early returns + flip after send |
+
+**Blockers caught**: none.
+
+**Pool watch**: non-Gmail pool now 699 (was 1,199 at the start of the rotation). At 250/send, it exhausts in ~3 more sends — well before the Gmail pool (2,029 remaining). After non-Gmail is depleted, future sends will either need to be Gmail-only or merge the remaining audiences.
+
+**Outcome**: TBD — fires at 18:50Z / 18:55Z. Stats and Gmail-only honest figures appended after maturity.
+
+---
+
 ## 2026-05-13 early morning — 250 Gmail + 250 non-Gmail Variant B
 
 **Planned**: 250 Gmail + 250 non-Gmail of Variant B parent template `db10a687-4233-4313-8431-8d2fa64a15c4` (subject "My upcoming concert and livestream"), sender `Lionel Yu <lionel@musicalbasics.com>`, append-mode click tracking, scheduled `2026-05-13T09:50:00Z` (Gmail child `a42899e3-6e81-4c3d-8058-aaa2b9fe3612`) / `2026-05-13T09:55:00Z` (non-Gmail child `f4bb8497-9428-4718-abfc-1127806428dc`). Third 250/250 send in the Variant B follow-up sequence.
