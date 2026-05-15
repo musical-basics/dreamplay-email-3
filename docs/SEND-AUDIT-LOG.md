@@ -15,6 +15,35 @@ entry shows the audit happened.
 
 ---
 
+## 2026-05-15 early morning — 250 Gmail + 250 non-Gmail Variant B (Send 5)
+
+**Planned**: 250 Gmail + 250 non-Gmail of Variant B parent `db10a687-...`, scheduled `2026-05-15T10:25:00Z` (Gmail child `8592210e-19a6-4a17-a45e-a89e8c1252cd`) / `2026-05-15T10:30:00Z` (non-Gmail child `a69983eb-f238-4473-8825-a83eb839aeb4`). Second send with the un-personalized template (greeting block removed on 2026-05-13 before Send 4 fired).
+
+**Audit at**: `2026-05-15T09:53Z`, ~30min before fire.
+
+**Verdict**: `SAFE`. No findings, no blockers.
+
+| Section | Verdict | Detail |
+|---|---|---|
+| A. Idempotency | PASS | [send-stream/route.ts:227-260](../app/api/send-stream/route.ts#L227), :416-422 |
+| B. Throttle headroom | PASS | 250 × ~900ms ≈ 225s vs 300s maxDuration |
+| C. Concurrency lock | PASS | All 4 functions share `global-send-lock` |
+| D. DB UNIQUE constraint | PASS | Applied and verified |
+| E. Audience query | PASS | [schedule-250-250.ts:88-107](../_work/schedule-250-250.ts) |
+| E2. scheduledAt freshness | PASS | now 09:53Z, Gmail T+32m, non-Gmail T+37m |
+| F. Rotation safety | PASS | Not exercised |
+| G. State guards | PASS | cancelled/sent early returns + flip after send |
+
+**Blockers caught**: none.
+
+**Context worth flagging**: Send 4 (the first un-personalized send) showed Gmail open rate steady at 32.4% (in line with personalized sends) but Gmail click count dropped to 1 vs 2-5 on prior sends. Real human click count across the 500-recipient send was ~2 vs ~5-7 for personalized sends. Send 5 is effectively the replication needed to confirm whether the click-rate dip is a real personalization effect or sample variance. Both un-personalized data points will be compared.
+
+**Pool watch**: After Send 5 fires, pool drops to Gmail 1,779 / non-Gmail **199**. The next send (Send 6) is the point where non-Gmail can no longer support a 250 split — Send 6 will be the 199 non-Gmail + 199 Gmail mixed final batch, or Gmail-only from here on.
+
+**Outcome**: TBD — fires at 10:25Z / 10:30Z. Honest Gmail-only figures will be appended after maturity.
+
+---
+
 ## 2026-05-13 afternoon — 250 Gmail + 250 non-Gmail Variant B (Send 4)
 
 **Planned**: 250 Gmail + 250 non-Gmail of Variant B parent template `db10a687-...`, scheduled `2026-05-13T18:50:00Z` (Gmail child `3ac3194f-6d16-4a7b-99f5-664ab919bd94`) / `2026-05-13T18:55:00Z` (non-Gmail child `6f7568be-c7e1-4170-963c-78f54d09e9db`). Eligible pool dropping: 2,978 → 2,478 after this send.
