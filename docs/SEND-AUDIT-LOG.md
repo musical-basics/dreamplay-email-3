@@ -15,6 +15,52 @@ entry shows the audit happened.
 
 ---
 
+## 2026-05-15 afternoon — 300/300 Gmail A/B personalization test (Send 7)
+
+**Planned**: 300 Gmail recipients per arm, split from a single random shuffle, both clones of the un-personalized Variant B parent template `db10a687-...`. Arm A (personalized, child `3c85a846-4886-48c2-a25d-77e97a9b5fb3`) gets a `<p>Hi {{first_name}},</p>` greeting paragraph re-inserted via direct supabase UPDATE to the child's `html_content` before scheduling. Arm B (un-personalized, child `706ee826-ce55-4e51-83c4-d77b5c0b6895`) inherits the parent's no-greeting state. ScheduledAt: `2026-05-15T19:05Z` / `2026-05-15T19:10Z`. Resolves the personalization-affects-click-rate hypothesis from Send 4's 1-click outcome.
+
+**Audit at**: `2026-05-15T18:00Z`, ~1h before fire.
+
+**Verdict**: `UNSAFE` on first pass → `SAFE` after fix → ran.
+
+### Section-by-section findings
+
+| Section | First pass | After fix |
+|---|---|---|
+| A. Idempotency | PASS | PASS |
+| B. Throttle headroom | PASS | PASS — 300 × ~900ms ≈ 270s vs 300s maxDuration. Tight (90% utilization); flagged but acceptable because idempotency makes any retry a no-op for already-sent recipients |
+| C. Concurrency lock | PASS | PASS |
+| D. DB UNIQUE constraint | PASS | PASS |
+| E. Audience query | PASS | PASS — Gmail-only filter on top of done-tag + Test Account exclusion; 600-cap |
+| E2. scheduledAt freshness | PASS | PASS — T+65m / T+70m |
+| F. Rotation safety | PASS | PASS |
+| G. State guards | PASS | PASS |
+| H. HTML patch correctness | **FAIL** | PASS (after fix) |
+| I. A/B integrity | PASS (conditional on H) | PASS |
+
+### Blocker caught and fixed before send
+
+**H. HTML patch indentation mismatch.** The script's `FIND` / `REPLACE` constants used 18-space + 20-space indentation for the `<p>` and inner text, but the live parent template's HTML uses 14-space + 16-space indentation. The mismatch came from my prior visual inspection — earlier diagnostic scripts that printed the HTML pre-padded each line with 4 spaces for terminal readability, so the visible indentation was 4 spaces deeper than the actual stored content. The auditor caught this by reading the live parent and counting bytes; the pre-flight check at `addGreetingToChild` would have aborted the whole script before any side effects (no test send, no clone, no schedule), but with no positive output the test wouldn't have run either.
+
+**Fix**: dedented both `FIND` and `REPLACE` constants by 4 spaces ([_work/ab-test-personalization-300-300.ts:48-58](../_work/ab-test-personalization-300-300.ts)). Dry-run via `_work/dryrun-patch.ts` confirmed: 1 FIND occurrence in the parent, single greeting in the patched result, html length grew by exactly 195 chars (matching what we removed on 2026-05-13). After the fix the production script ran cleanly: test sends went out, arm A's child was patched correctly, both children scheduled.
+
+### Lessons recorded
+
+- **Pre-padded HTML dumps are a debugging trap.** When inspecting HTML stored in a JSONB / TEXT column via a diagnostic script that pretty-prints with indentation prefix, the visible whitespace is NOT the source-of-truth whitespace. The auditor now reads the column directly without printing, and counts bytes. Future scripts touching template HTML should use a regex-based patch (whitespace-tolerant) or a byte-count probe before committing the exact-string FIND. The current script's `addGreetingToChild` has the right safeguards (anchor-must-exist + post-patch validation); the fix was to the constant strings only.
+- **Auditor caught a real bug.** First time the audit returned anything other than SAFE on first pass. Worked exactly as intended — read-only investigation found a content issue that pre-flight checks in the script would have caught at runtime, but at the cost of a fully-aborted run with no test output.
+
+### Outcome
+
+Tests fired immediately to 8 Test Accounts:
+- Un-personalized test child: `144980e8-dd9d-4401-8f8d-44498fe1f0ee`
+- Personalized test child: `816c7c09-094d-44ac-b725-a9e6ea49bdbc`
+
+Production scheduled, 600 tagged. Pool after fire: Gmail **980** / non-Gmail 0.
+
+A/B results TBD — fires at 19:05Z / 19:10Z. The mature comparison will be: Arm A (personalized) Gmail click rate vs Arm B (un-personalized) Gmail click rate. Combined with Send 4 / Send 5 / Send 6 prior data points, this gives n=300 per condition at this single send + cross-send aggregation.
+
+---
+
 ## 2026-05-15 morning — 199 Gmail + 199 non-Gmail mixed final batch (Send 6)
 
 **Planned**: 199 Gmail + 199 non-Gmail = 398 total. Variant B parent `db10a687-...`. Gmail child `7af65782-dabf-4b73-899c-cc86f078d9c9` at `2026-05-15T13:15:00Z`, non-Gmail child `9234d152-1598-4ad9-8b6c-9af2364ce6f1` at `2026-05-15T13:20:00Z`. This **exhausts the non-Gmail pool**: after this fires, only 199 non-Gmail subscribers were ever left and all 199 will have been targeted. Future sends will be Gmail-only or require a new audience definition.
