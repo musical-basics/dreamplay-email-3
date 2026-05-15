@@ -76,6 +76,7 @@ The send-safety auditor must be re-run after any code change to the send pipelin
 
 - Incident write-up: [docs/INCIDENT-2026-05-12-gmail-double-send.md](docs/INCIDENT-2026-05-12-gmail-double-send.md)
 - Send audit log (one entry per bulk send, newest on top): [docs/SEND-AUDIT-LOG.md](docs/SEND-AUDIT-LOG.md). After every audited send, append a new entry with the auditor's verdict, what was caught and fixed, what was deferred, and the outcome once the send completed.
+- Sends index (tabular reference of every send ever, regenerated from the DB): [docs/SENDS-INDEX.md](docs/SENDS-INDEX.md). Run `npx tsx _work/build-sends-index.ts` to refresh. The audit log captures per-send detail and findings; this index captures every send with a scannable date/subject/recipients/status row.
 - Overnight reconciliation context: [docs/BRANCH-NOTES-overnight-reconciliation.md](docs/BRANCH-NOTES-overnight-reconciliation.md)
 - Most recent session handoff: [docs/SESSION-HANDOFF-2026-05-12.md](docs/SESSION-HANDOFF-2026-05-12.md)
 - Agent API surface: [docs/EMAIL-AGENTS-API.md](docs/EMAIL-AGENTS-API.md)
