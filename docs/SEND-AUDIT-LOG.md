@@ -15,6 +15,40 @@ entry shows the audit happened.
 
 ---
 
+## 2026-05-15 morning — 199 Gmail + 199 non-Gmail mixed final batch (Send 6)
+
+**Planned**: 199 Gmail + 199 non-Gmail = 398 total. Variant B parent `db10a687-...`. Gmail child `7af65782-dabf-4b73-899c-cc86f078d9c9` at `2026-05-15T13:15:00Z`, non-Gmail child `9234d152-1598-4ad9-8b6c-9af2364ce6f1` at `2026-05-15T13:20:00Z`. This **exhausts the non-Gmail pool**: after this fires, only 199 non-Gmail subscribers were ever left and all 199 will have been targeted. Future sends will be Gmail-only or require a new audience definition.
+
+**Audit at**: `2026-05-15T10:14Z`, ~3 hours before fire.
+
+**Verdict**: `SAFE`. No findings, no blockers.
+
+| Section | Verdict | Detail |
+|---|---|---|
+| A. Idempotency | PASS | [send-stream/route.ts:227-260](../app/api/send-stream/route.ts#L227), per-row insert :416-422 |
+| B. Throttle headroom | PASS | 199 × ~900ms ≈ 180s vs 300s maxDuration (60% utilization) |
+| C. Concurrency lock | PASS | All 4 functions share `global-send-lock`; Send 5's 10:25/10:30Z children complete well before Send 6's 13:15Z fire |
+| D. DB UNIQUE constraint | PASS | Applied and verified |
+| E. Audience query | PASS | [schedule-250-250.ts](../_work/schedule-250-250.ts) with `SAMPLE_SIZE=199`; `Math.min(SAMPLE_SIZE, nonGmail.length)` correctly takes all 199 non-Gmail; Gmail pool 1,779 has ample headroom |
+| E2. scheduledAt freshness | PASS | now 10:14Z, Gmail T+181m, non-Gmail T+186m |
+| F. Rotation safety | PASS | Not exercised |
+| G. State guards | PASS | cancelled/sent early returns + flip after send |
+| H. Child labels | PASS | "199 Gmail @ ..." and "199 non-Gmail @ ..." (script now uses `${gmailPicks.length}` instead of hardcoded "250") |
+
+**Blockers caught**: none.
+
+**Script change applied as part of this audit**:
+- `_work/schedule-250-250.ts:138` — child name was hardcoded `"250 Gmail @ ..."` even though `nonGmailPicks.length` was already dynamic at :165. Updated Gmail to also use `${gmailPicks.length}` for symmetry. Future runs at any SAMPLE_SIZE label correctly.
+
+**Pool watch (after this send fires)**:
+- Gmail eligible: 1,580 (was 1,779, minus 199 picked)
+- non-Gmail eligible: **0** (was 199, minus 199 picked) — pool exhausted
+- Total eligible for future sends in this rotation: 1,580 Gmail-only
+
+**Outcome**: TBD — fires at 13:15Z / 13:20Z. Will record Send 6 stats once mature, alongside aggregate Sends 5+6 (the two un-personalized data points) vs Sends 1-3 (personalized) to nail the personalization-click-rate hypothesis.
+
+---
+
 ## 2026-05-15 early morning — 250 Gmail + 250 non-Gmail Variant B (Send 5)
 
 **Planned**: 250 Gmail + 250 non-Gmail of Variant B parent `db10a687-...`, scheduled `2026-05-15T10:25:00Z` (Gmail child `8592210e-19a6-4a17-a45e-a89e8c1252cd`) / `2026-05-15T10:30:00Z` (non-Gmail child `a69983eb-f238-4473-8825-a83eb839aeb4`). Second send with the un-personalized template (greeting block removed on 2026-05-13 before Send 4 fired).
