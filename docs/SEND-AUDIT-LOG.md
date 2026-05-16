@@ -15,6 +15,39 @@ entry shows the audit happened.
 
 ---
 
+## 2026-05-16 early morning — 250/250 Gmail revival A/B (Send 8)
+
+**Planned**: 250 + 250 Gmail re-engagement A/B against a clean audience class.
+
+**Audience filter (clean re-engagement)**: Active Gmail subscribers who (a) received at least one "After years of work, two things are finally happening" campaign, (b) are NOT tagged `done-belgium-followup-b` (have never been touched by ANY Variant B follow-up wave — covers both "livestream" subject and the earlier May 8-9 Variant B sends with different subjects), and (c) have zero open events across either cohort. **641 candidates total → 500 picked, 250 per arm.** Many of these recipients are likely 2026-05-03 redirect-mode bulk-flag victims whose original Variant A copy never reached their inbox.
+
+**Notable**: 100% of the clean audience is Gmail. Non-Gmail recipients of "After years of work" who hadn't opened it have ALL since been touched by some Variant B follow-up (the non-Gmail pool exhausted during Sends 1-6). So the clean re-engagement pool is Gmail-only by side effect of prior tagging.
+
+**Arm A**: Variant A parent (`b04a217d-...`), subject "After years of work, two things are finally happening", body unchanged. Child `57ecce8e-6c9d-48a5-be87-92c5e08cc163`. The exact email these recipients didn't open before.
+
+**Arm B**: Variant B parent (`db10a687-...`), subject "My upcoming concert and livestream", with `<p>Hi {{first_name}},</p>` greeting paragraph patched in. Child `bb463621-9ecf-4c18-9534-69e45ee658bf`. First time these recipients see this content.
+
+**Audit at**: `2026-05-16T05:28Z`, ~30 min before the original scheduledAt.
+
+**First-pass verdict**: `NEEDS_REVIEW`. The auditor flagged:
+
+| Finding | Detail |
+|---|---|
+| **B. Throttle headroom — FAIL** | Original draft was 400 per arm. 400 × ~1050ms ≈ 420s vs 300s `maxDuration`. Auditor recommended truncating to ≤ 250 per arm. |
+| **Re-targeting concern** | 587 of original 800 (73%) were already tagged `done-belgium-followup-b`. Surfaced as a CLAUDE.md rule deviation. |
+| All other sections | PASS — idempotency, concurrency lock, DB constraint, HTML state (Arm B greeting patched correctly, Arm A no double-personalization despite Variant A's built-in `{{first_name}}`), A/B disjointness all verified directly against the live DB. |
+
+**Resolution (before fire)**:
+1. **Truncated to 250 per arm** per auditor recommendation. Each child ~225s within maxDuration, both arms fire on-schedule with no retry-cycle noise.
+2. **Tightened audience to "received_A AND NOT tagged done-belgium-followup-b"** — strict re-engagement filter. Dropped from 800 to 500 recipients across a cleaner pool (641 candidates). Re-targeting concern resolved: no one in the final 500 has been touched by any Variant B follow-up.
+3. Drafts updated in-place via direct Supabase UPDATE of `variable_values.subscriber_ids` rather than re-cloning, so the existing test sends and pre-vetted HTML state remained valid.
+
+**Time slip during execution**: Scheduled values were `2026-05-16T06:00:00Z` (Arm A) and `06:05:00Z` (Arm B). The conversation paused ~70 minutes between final approval prompt and user's "go" confirmation, so by the time the `/send` calls fired both scheduledAt values were in the past. Inngest's `step.sleepUntil` with a past Date resolves immediately, so the two arms fired back-to-back via the concurrency lock starting `~2026-05-16T06:39Z`. Effective fire times: Arm A ~06:39Z (≈ 2:39 AM EDT), Arm B ~06:43Z. Still in the overnight engagement bucket; not a deliverability concern.
+
+**Outcome**: TBD. Honest signal will be Gmail open rate at 24-48h elapsed. Hypothesis: the Variant A arm should show a recovery effect (recipients who never saw the bulk-flagged original get a clean inbox delivery this time); Variant B is testing whether a fresh subject reaches them better.
+
+---
+
 ## 2026-05-15 afternoon — 300/300 Gmail A/B personalization test (Send 7)
 
 **Planned**: 300 Gmail recipients per arm, split from a single random shuffle, both clones of the un-personalized Variant B parent template `db10a687-...`. Arm A (personalized, child `3c85a846-4886-48c2-a25d-77e97a9b5fb3`) gets a `<p>Hi {{first_name}},</p>` greeting paragraph re-inserted via direct supabase UPDATE to the child's `html_content` before scheduling. Arm B (un-personalized, child `706ee826-ce55-4e51-83c4-d77b5c0b6895`) inherits the parent's no-greeting state. ScheduledAt: `2026-05-15T19:05Z` / `2026-05-15T19:10Z`. Resolves the personalization-affects-click-rate hypothesis from Send 4's 1-click outcome.
