@@ -15,7 +15,7 @@ entry shows the audit happened.
 
 ---
 
-## 2026-05-21 evening — Campaign 2 wave 1: 250/250 designed vs plain A/B (Send 11 + Send 12)
+## 2026-05-21 evening, Campaign 2 wave 1: 250/250 designed vs plain A/B (Send 11 + Send 12)
 
 **Planned**: First Campaign 2 ("No School Today" composition announcement) production wave. 250 Gmail subscribers per arm. Arm A is the designed dark-themed HTML (Variant B visual language with composition content), child `60f0a5ba-5892-4660-8a0e-e7d906a766ac` at `2026-05-22T00:05:00Z`. Arm B is the minimal plain Gmail-style HTML, child `fbede858-5cd5-4efb-a9d8-0b70e64337ad` at `2026-05-22T00:10:00Z`. Same subject "I just finished a piece I started writing 20 years ago", sender lionel@musicalbasics.com, append-mode click tracking. The A/B variable is HTML design only.
 
@@ -33,7 +33,7 @@ Master log [_work/no-school-today-audience-log.csv](../_work/no-school-today-aud
 
 ---
 
-## 2026-05-21 late afternoon, evening — Campaign 1 FINAL 240+240 (Send 9 + Send 10)
+## 2026-05-21 late afternoon and evening, Campaign 1 FINAL 240+240 (Send 9 + Send 10)
 
 **Planned**: Final Campaign 1 cleanup. Two children of 240 Gmail subscribers each, both clones of Variant B parent `db10a687-...` with the personalization greeting patched in (winning variant from Send 7). Subject "My upcoming concert and livestream". Sender `Lionel Yu <lionel@musicalbasics.com>`, append-mode click tracking. Send A child `20eea907-428d-4e17-b894-2f8b5ca0a2d6` at `2026-05-21T21:00:00Z`. Send B child `a37cc569-8136-431e-bf88-aac6b56c603d` at `2026-05-21T22:00:00Z`. Hour-apart stagger. 
 
@@ -43,7 +43,7 @@ Master log [_work/no-school-today-audience-log.csv](../_work/no-school-today-aud
 
 **Verdict**: `SAFE`. No findings, no blockers. All standard sections PASS. Throttle math (240 × ~950ms ≈ 228s vs 300s maxDuration) puts utilization at ~76%, comfortable. HTML patch path proven from Send 8 + Send 7. Concurrency lock with 1-hour stagger gives Send A plenty of time to complete (~4 min real wall-clock) before Send B's sleepUntil expires.
 
-**Outcome**: TBD — fires at 21:00Z / 22:00Z this evening. Will append maturity stats to `docs/CAMPAIGN-1-RESULTS.md` once data is in.
+**Outcome**: TBD, fires at 21:00Z / 22:00Z this evening. Will append maturity stats to `docs/CAMPAIGN-1-RESULTS.md` once data is in.
 
 **Notes**: The two prior A/B experiments (Send 7 personalization, Send 8 revival) have fully matured. Mature results:
 - Send 7A (personalized): 105 / 300 = **35.0%** Gmail opens, 2 clicks. Send 7B (un-personalized): 86 / 300 = **28.7%** Gmail opens, 2 clicks. Personalization adds **+6.3pp opens, tied clicks**.
