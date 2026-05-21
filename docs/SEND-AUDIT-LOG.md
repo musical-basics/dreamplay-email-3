@@ -15,6 +15,24 @@ entry shows the audit happened.
 
 ---
 
+## 2026-05-21 evening — Campaign 2 wave 1: 250/250 designed vs plain A/B (Send 11 + Send 12)
+
+**Planned**: First Campaign 2 ("No School Today" composition announcement) production wave. 250 Gmail subscribers per arm. Arm A is the designed dark-themed HTML (Variant B visual language with composition content), child `60f0a5ba-5892-4660-8a0e-e7d906a766ac` at `2026-05-22T00:05:00Z`. Arm B is the minimal plain Gmail-style HTML, child `fbede858-5cd5-4efb-a9d8-0b70e64337ad` at `2026-05-22T00:10:00Z`. Same subject "I just finished a piece I started writing 20 years ago", sender lionel@musicalbasics.com, append-mode click tracking. The A/B variable is HTML design only.
+
+**Audience**: 500 Gmail subscribers tagged `done-belgium-followup-b` (received Variant B in some prior wave), excluding the 480 just queued for Campaign 1 final. Pool of ~3,129 candidates Gmail, 500 picked with fresh shuffle, split 250/250 disjoint. Tagged `done-no-school-today` (new) after schedule for future de-duplication.
+
+**Audit at**: `2026-05-21T23:33Z`, ~32 min before Arm A fire.
+
+**Verdict**: `SAFE`. No findings, no blockers. Throttle (250 × ~950ms ≈ 238s vs 300s maxDuration) at 79% utilization, comfortable. **H. HTML em-dash purity: PASS** (both children verified zero em dashes after user feedback on the prior draft). All other sections PASS.
+
+**Outcome**: TBD. Both arms fire within the next ~40 min. Honest signal at 24-48h elapsed:
+- Style 1 (designed) vs Style 2 (plain) Gmail open rate, comparing whether plain-text "personal email" feel hits Primary tab better than designed marketing-style HTML.
+- Total Gmail clicks across both arms as the practical "did this get any human engagement" check.
+
+Master log [_work/no-school-today-audience-log.csv](../_work/no-school-today-audience-log.csv) seeded with 500 rows, one per (recipient, send event).
+
+---
+
 ## 2026-05-21 late afternoon, evening — Campaign 1 FINAL 240+240 (Send 9 + Send 10)
 
 **Planned**: Final Campaign 1 cleanup. Two children of 240 Gmail subscribers each, both clones of Variant B parent `db10a687-...` with the personalization greeting patched in (winning variant from Send 7). Subject "My upcoming concert and livestream". Sender `Lionel Yu <lionel@musicalbasics.com>`, append-mode click tracking. Send A child `20eea907-428d-4e17-b894-2f8b5ca0a2d6` at `2026-05-21T21:00:00Z`. Send B child `a37cc569-8136-431e-bf88-aac6b56c603d` at `2026-05-21T22:00:00Z`. Hour-apart stagger. 
