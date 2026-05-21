@@ -1,8 +1,8 @@
-# Session Handoff — 2026-05-12
+# Session Handoff, 2026-05-12
 
 Picked up where the May 8-12 Variant B follow-up campaign work left off. This doc is the first thing the next session should read.
 
-## TL;DR — what's live, what's scheduled, what to know
+## TL;DR, what's live, what's scheduled, what to know
 
 - **Scheduled to fire shortly**: two batches at `2026-05-12T02:25:00Z` (250 Gmail) and `02:30:00Z` (250 non-Gmail) with subject "My upcoming concert and livestream". `scheduled_status="pending"` on both. Inngest functions queued at those times.
 - **Click attribution chain is now live and verified end-to-end** (via iPhone test click landing in `subscriber_events`). Architecture below.
@@ -27,7 +27,7 @@ These were cancelled briefly tonight (user said "pause") and uncancelled (user s
 Took several iterations to land. Final state:
 
 1. **Email links use append mode**: `?sid=<sub_id>&cid=<campaign_id>` appended to destination URLs (no redirect wrapper).
-2. **Hosted attribution beacon** at `https://email.dreamplaypianos.com/track-attribution.js` (served from `public/track-attribution.js` in `dreamplay-email-2` repo — note: dp-email-2, not dp-email-3, because `email.dreamplaypianos.com` CNAME aliases dp-email-2). Cache-Control: `public, max-age=300`.
+2. **Hosted attribution beacon** at `https://email.dreamplaypianos.com/track-attribution.js` (served from `public/track-attribution.js` in `dreamplay-email-2` repo, note: dp-email-2, not dp-email-3, because `email.dreamplaypianos.com` CNAME aliases dp-email-2). Cache-Control: `public, max-age=300`.
 3. **Script body uses Image beacon** (`new Image(); beacon.src = ...`) instead of `fetch`. Fetch was being silently blocked by Safari ITP on iPhone. Image beacons bypass CORS, ITP, and tracker blockers.
 4. **Landing page** `belgium-concert-landing-page` includes a one-line `<script src="https://email.dreamplaypianos.com/track-attribution.js" async />` in `src/app/layout.tsx`.
 5. **Beacon fires** `https://email.dreamplaypianos.com/api/track/click?c=<cid>&s=<sid>&u=<page_url>` cross-origin. dp-email-2's endpoint inserts into `subscriber_events` (table is in the email Supabase project `quyqwdjygzalqqmrgkfk`, the right one for our analytics queries).
@@ -75,18 +75,18 @@ Production live at email.dreamplaypianos.com.
 | "My upcoming concert and livestream" | 506 (3 children) | **26.7%** | Current winner. Gmail 32.5%, non-Gmail 21.5%. Adds livestream hook = lower activation cost. |
 | "My only concert this year" | 400 (4 children, rounds 1+2) | 24.0% | Proven baseline. Balanced both groups. |
 | "My only public concert this year" | 147 (R4) | 19.7% | Great on non-Gmail (29.2%), terrible on Gmail (10.7%). |
-| "Will I see you in Belgium?" | 147 (R3) | 16.3% | Worst. Non-Gmail 9.9% — question marks tank non-Gmail providers. |
+| "Will I see you in Belgium?" | 147 (R3) | 16.3% | Worst. Non-Gmail 9.9%, question marks tank non-Gmail providers. |
 
 3 unsubs total on the "livestream" subject (hot rate 2.2% on 135 openers) = healthy, no phishing-banner signature.
 
-Parent Variant B template (`db10a687-...`) currently has subject "My upcoming concert and livestream" — last patched 2026-05-11.
+Parent Variant B template (`db10a687-...`) currently has subject "My upcoming concert and livestream", last patched 2026-05-11.
 
 ## Audience pool state
 
 - Total active musicalbasics subscribers: ~5,730 (as of last full count)
 - Tagged `done-belgium-followup-b`: ~1,306 + 500 from cancelled-then-resumed 250/250 = ~1,806 once tonight's send completes
 - Tagged `done-belgium-masterclass` (from May 3 Variant A overnight): ~5,722 (essentially everyone)
-- **Remaining eligible after tonight (250/250 fires)**: 3,978 untouched — snapshot at `_work/remaining-eligible-2026-05-12.csv`
+- **Remaining eligible after tonight (250/250 fires)**: 3,978 untouched, snapshot at `_work/remaining-eligible-2026-05-12.csv`
 
 ### Key audience rule (current)
 
@@ -98,18 +98,18 @@ active musicalbasics subscribers
   not tagged "done-belgium-followup-b"
 ```
 
-This is broader than "non-openers" — includes engaged subscribers too. Worth noting for interpretation: open rates from tonight's 250/250 may be higher than previous Variant B sends because the audience isn't filtered to disengaged.
+This is broader than "non-openers", includes engaged subscribers too. Worth noting for interpretation: open rates from tonight's 250/250 may be higher than previous Variant B sends because the audience isn't filtered to disengaged.
 
 ## Critical guardrails learned this session
 
-1. **Resend rate limit on this account is 5 req/s** (verified from 2026-05-09 429 error). Default Pro tier is 10 req/s — this account is at 5. Important for cadence planning.
-2. **NEVER schedule multiple Inngest send functions with the same `scheduledAt`** in production. They wake simultaneously and collectively exceed the 5 req/s limit. Result on 2026-05-09 rounds 3+4: 26% of 400 planned sends failed. Always stagger by at least 60s for 100-recipient children, 90s+ for 500-recipient children. (`feat/sequential-send-concurrency` branch fixes this with an Inngest concurrency lock — but unmerged.)
+1. **Resend rate limit on this account is 5 req/s** (verified from 2026-05-09 429 error). Default Pro tier is 10 req/s, this account is at 5. Important for cadence planning.
+2. **NEVER schedule multiple Inngest send functions with the same `scheduledAt`** in production. They wake simultaneously and collectively exceed the 5 req/s limit. Result on 2026-05-09 rounds 3+4: 26% of 400 planned sends failed. Always stagger by at least 60s for 100-recipient children, 90s+ for 500-recipient children. (`feat/sequential-send-concurrency` branch fixes this with an Inngest concurrency lock, but unmerged.)
 3. **Production code on dp-email-3 main still has 600ms per-recipient throttle** (not the 200ms fix). 500-recipient batches still fit in the 300s `maxDuration` window but at the low end.
 4. **Sender domain reputation at Gmail is slowly recovering** from the May 3 incident (cadence-triggered bulk-flagging on the 10x500 overnight). Mature data shows acceptable open rates but not back to slot-1's 51%. Continue with conservative cadence.
 
 ## Memory rules updated this session
 
-- `feedback_verify_current_time.md`: always run `date -u` before scheduling — system reminders have been wrong multiple times
+- `feedback_verify_current_time.md`: always run `date -u` before scheduling, system reminders have been wrong multiple times
 - `feedback_stagger_concurrent_sends.md`: never use the same scheduledAt for 2+ send children; stagger sequentially
 
 ## What to do next (suggested)
@@ -142,19 +142,19 @@ Helpful constants for the next session:
 
 Manifests (gitignored under `_work/`):
 
-- `_work/overnight-manifest.json` — May 3 overnight 10-batch Variant A schedule
-- `_work/ab-test-100-100-manifest.json` — rounds 1+2
-- `_work/ab-test-round-2-manifest.json` — round 2 of follow-up
-- `_work/ab-test-rounds-3-4-manifest.json` — rounds 3+4 with subject A/B
-- `_work/round-5-rescue-106-manifest.json` — the 106-failure rescue + rounds-3+4 retry
-- `_work/round-5-and-200-200-manifest.json` — May 10 rescue + 200/200
-- `_work/schedule-250-250-manifest.json` — the May 12 250/250 (cancelled, uncancelled)
-- `_work/remaining-eligible-2026-05-12.csv` / `.json` — current pool snapshot
+- `_work/overnight-manifest.json`, May 3 overnight 10-batch Variant A schedule
+- `_work/ab-test-100-100-manifest.json`, rounds 1+2
+- `_work/ab-test-round-2-manifest.json`, round 2 of follow-up
+- `_work/ab-test-rounds-3-4-manifest.json`, rounds 3+4 with subject A/B
+- `_work/round-5-rescue-106-manifest.json`, the 106-failure rescue + rounds-3+4 retry
+- `_work/round-5-and-200-200-manifest.json`, May 10 rescue + 200/200
+- `_work/schedule-250-250-manifest.json`, the May 12 250/250 (cancelled, uncancelled)
+- `_work/remaining-eligible-2026-05-12.csv` / `.json`, current pool snapshot
 
 ## Key check / diagnostic scripts in `_work/`
 
-- `check-all-rounds.ts` / `check-all-sends-with-new.ts` — comprehensive open-rate + by-subject + by-group view across all rounds
-- `check-overnight-by-provider.ts` — Gmail vs non-Gmail vs Apple vs Microsoft breakdown
-- `check-overnight-uniques.ts` — per-batch unique opens + click totals
-- `recent-all-events.ts` — last 15 min of any subscriber_events activity (good for debugging)
-- `check-test-events.ts` — events for the latest test campaign
+- `check-all-rounds.ts` / `check-all-sends-with-new.ts`, comprehensive open-rate + by-subject + by-group view across all rounds
+- `check-overnight-by-provider.ts`, Gmail vs non-Gmail vs Apple vs Microsoft breakdown
+- `check-overnight-uniques.ts`, per-batch unique opens + click totals
+- `recent-all-events.ts`, last 15 min of any subscriber_events activity (good for debugging)
+- `check-test-events.ts`, events for the latest test campaign
