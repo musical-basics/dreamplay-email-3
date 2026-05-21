@@ -53,11 +53,11 @@ Both findings informed the Campaign 1 final variant choice (personalized + lives
 
 ---
 
-## 2026-05-16 early morning — 250/250 Gmail revival A/B (Send 8)
+## 2026-05-16 early morning, 250/250 Gmail revival A/B (Send 8)
 
 **Planned**: 250 + 250 Gmail re-engagement A/B against a clean audience class.
 
-**Audience filter (clean re-engagement)**: Active Gmail subscribers who (a) received at least one "After years of work, two things are finally happening" campaign, (b) are NOT tagged `done-belgium-followup-b` (have never been touched by ANY Variant B follow-up wave — covers both "livestream" subject and the earlier May 8-9 Variant B sends with different subjects), and (c) have zero open events across either cohort. **641 candidates total → 500 picked, 250 per arm.** Many of these recipients are likely 2026-05-03 redirect-mode bulk-flag victims whose original Variant A copy never reached their inbox.
+**Audience filter (clean re-engagement)**: Active Gmail subscribers who (a) received at least one "After years of work, two things are finally happening" campaign, (b) are NOT tagged `done-belgium-followup-b` (have never been touched by ANY Variant B follow-up wave, covers both "livestream" subject and the earlier May 8-9 Variant B sends with different subjects), and (c) have zero open events across either cohort. **641 candidates total → 500 picked, 250 per arm.** Many of these recipients are likely 2026-05-03 redirect-mode bulk-flag victims whose original Variant A copy never reached their inbox.
 
 **Notable**: 100% of the clean audience is Gmail. Non-Gmail recipients of "After years of work" who hadn't opened it have ALL since been touched by some Variant B follow-up (the non-Gmail pool exhausted during Sends 1-6). So the clean re-engagement pool is Gmail-only by side effect of prior tagging.
 
@@ -71,30 +71,30 @@ Both findings informed the Campaign 1 final variant choice (personalized + lives
 
 | Finding | Detail |
 |---|---|
-| **B. Throttle headroom — FAIL** | Original draft was 400 per arm. 400 × ~1050ms ≈ 420s vs 300s `maxDuration`. Auditor recommended truncating to ≤ 250 per arm. |
+| **B. Throttle headroom, FAIL** | Original draft was 400 per arm. 400 × ~1050ms ≈ 420s vs 300s `maxDuration`. Auditor recommended truncating to ≤ 250 per arm. |
 | **Re-targeting concern** | 587 of original 800 (73%) were already tagged `done-belgium-followup-b`. Surfaced as a CLAUDE.md rule deviation. |
-| All other sections | PASS — idempotency, concurrency lock, DB constraint, HTML state (Arm B greeting patched correctly, Arm A no double-personalization despite Variant A's built-in `{{first_name}}`), A/B disjointness all verified directly against the live DB. |
+| All other sections | PASS, idempotency, concurrency lock, DB constraint, HTML state (Arm B greeting patched correctly, Arm A no double-personalization despite Variant A's built-in `{{first_name}}`), A/B disjointness all verified directly against the live DB. |
 
 **Resolution (before fire)**:
 1. **Truncated to 250 per arm** per auditor recommendation. Each child ~225s within maxDuration, both arms fire on-schedule with no retry-cycle noise.
-2. **Tightened audience to "received_A AND NOT tagged done-belgium-followup-b"** — strict re-engagement filter. Dropped from 800 to 500 recipients across a cleaner pool (641 candidates). Re-targeting concern resolved: no one in the final 500 has been touched by any Variant B follow-up.
+2. **Tightened audience to "received_A AND NOT tagged done-belgium-followup-b"**, strict re-engagement filter. Dropped from 800 to 500 recipients across a cleaner pool (641 candidates). Re-targeting concern resolved: no one in the final 500 has been touched by any Variant B follow-up.
 3. Drafts updated in-place via direct Supabase UPDATE of `variable_values.subscriber_ids` rather than re-cloning, so the existing test sends and pre-vetted HTML state remained valid.
 
 **Time slip during execution**: Scheduled values were `2026-05-16T06:00:00Z` (Arm A) and `06:05:00Z` (Arm B). The conversation paused ~70 minutes between final approval prompt and user's "go" confirmation, so by the time the `/send` calls fired both scheduledAt values were in the past. Inngest's `step.sleepUntil` with a past Date resolves immediately, so the two arms fired back-to-back via the concurrency lock starting `~2026-05-16T06:39Z`. Effective fire times: Arm A ~06:39Z (≈ 2:39 AM EDT), Arm B ~06:43Z. Still in the overnight engagement bucket; not a deliverability concern.
 
-**Outcome (delivery)**: Both campaigns completed cleanly. Arm A delivered **214 / 250** (`57ecce8e-...`); Arm B delivered **209 / 250** (`bb463621-...`). **77 recipients (~15%) were filtered out at send-time** by send-stream's `status="active"` filter at [app/api/send-stream/route.ts:199](../app/api/send-stream/route.ts#L199). The most plausible cause: some recipients became `unsubscribed` between manifest build (2026-05-15 evening) and send (2026-05-16 06:39-06:43Z). This is a non-trivial gap on a re-engagement audience — these 500 had already received the bulk-flagged Variant A copy weeks earlier; Gmail List-Unsubscribe header processing may have flipped some of them. Note that those 77 recipients ARE still tagged `done-belgium-followup-b` (the bulk-tag step ran before send-stream filtered them) so they won't be re-targeted in this rotation. Net: 423 emails out, 87% of the planned 500.
+**Outcome (delivery)**: Both campaigns completed cleanly. Arm A delivered **214 / 250** (`57ecce8e-...`); Arm B delivered **209 / 250** (`bb463621-...`). **77 recipients (~15%) were filtered out at send-time** by send-stream's `status="active"` filter at [app/api/send-stream/route.ts:199](../app/api/send-stream/route.ts#L199). The most plausible cause: some recipients became `unsubscribed` between manifest build (2026-05-15 evening) and send (2026-05-16 06:39-06:43Z). This is a non-trivial gap on a re-engagement audience, these 500 had already received the bulk-flagged Variant A copy weeks earlier; Gmail List-Unsubscribe header processing may have flipped some of them. Note that those 77 recipients ARE still tagged `done-belgium-followup-b` (the bulk-tag step ran before send-stream filtered them) so they won't be re-targeted in this rotation. Net: 423 emails out, 87% of the planned 500.
 
 **Outcome (engagement)**: TBD. Honest signal will be Gmail open rate at 24-48h elapsed. Hypothesis: the Variant A arm should show a recovery effect (recipients who never saw the bulk-flagged original get a clean inbox delivery this time); Variant B is testing whether a fresh subject reaches them better.
 
 ### Lessons recorded
 
 - **Time-slip risk on tight-window scheduling**: A 70-minute pause between final-approval prompt and user's "go" confirmation pushed the `scheduledAt=06:00Z` value into the past. Inngest's `step.sleepUntil` with a past Date resolves immediately, so the send fired ~40 min later than planned. No deliverability harm (the late-night/overnight window is actually one of our strongest in the time-of-day analysis), but the planned vs effective fire diverged. **Process fix**: before calling `/send` on a draft, the scheduler script should compare `scheduledAt` to current time and either (a) refuse to schedule with a past value, (b) auto-bump to `now() + min_lead`, or (c) require an explicit `--allow-past-fire` flag. The agent API itself could enforce the same. Until that lands, when approving a tight-window send, the conversation should confirm time within the last few minutes of the actual `/send` call, not at audit-pass time.
-- **Active-status attrition between manifest and send**: 15% of a re-engagement audience was filtered out at send-time because subscribers became inactive between when we picked them (manifest build, T-12h) and when send-stream ran (T-0). For audiences of "people who didn't engage with prior sends," this attrition rate is much higher than for fresh audiences (Sends 1-6 saw <2% attrition). **For the spreadsheet to match what actually shipped**, regenerate the audience CSV after the send completes, filtered to subscribers who actually have a `sent_history` row for the child. Or accept that the planned-vs-actual gap is real and informative ("X% of non-openers unsubscribe before we re-engage them"). The dropped 77 are still tagged `done-belgium-followup-b` so they won't be re-picked — but if the user wants to re-target them on the way back to active, they'd need to drop the tag first.
+- **Active-status attrition between manifest and send**: 15% of a re-engagement audience was filtered out at send-time because subscribers became inactive between when we picked them (manifest build, T-12h) and when send-stream ran (T-0). For audiences of "people who didn't engage with prior sends," this attrition rate is much higher than for fresh audiences (Sends 1-6 saw <2% attrition). **For the spreadsheet to match what actually shipped**, regenerate the audience CSV after the send completes, filtered to subscribers who actually have a `sent_history` row for the child. Or accept that the planned-vs-actual gap is real and informative ("X% of non-openers unsubscribe before we re-engage them"). The dropped 77 are still tagged `done-belgium-followup-b` so they won't be re-picked, but if the user wants to re-target them on the way back to active, they'd need to drop the tag first.
 - **The auditor caught a real-cost mistake**: First time the audit returned `NEEDS_REVIEW` and the fix mattered. The 400/400 path would have shipped, completed via idempotency retry, but generated 4 "error"-marked `send_logs` rows and shifted Arm B's fire by ~10 minutes. The truncation to 250 per arm + audience tightening took ~5 minutes total and saved ~30 minutes of operator confusion + log noise reading. Validates keeping the audit as a hard gate, not an optional check.
 
 ---
 
-## 2026-05-15 afternoon — 300/300 Gmail A/B personalization test (Send 7)
+## 2026-05-15 afternoon, 300/300 Gmail A/B personalization test (Send 7)
 
 **Planned**: 300 Gmail recipients per arm, split from a single random shuffle, both clones of the un-personalized Variant B parent template `db10a687-...`. Arm A (personalized, child `3c85a846-4886-48c2-a25d-77e97a9b5fb3`) gets a `<p>Hi {{first_name}},</p>` greeting paragraph re-inserted via direct supabase UPDATE to the child's `html_content` before scheduling. Arm B (un-personalized, child `706ee826-ce55-4e51-83c4-d77b5c0b6895`) inherits the parent's no-greeting state. ScheduledAt: `2026-05-15T19:05Z` / `2026-05-15T19:10Z`. Resolves the personalization-affects-click-rate hypothesis from Send 4's 1-click outcome.
 
@@ -107,11 +107,11 @@ Both findings informed the Campaign 1 final variant choice (personalized + lives
 | Section | First pass | After fix |
 |---|---|---|
 | A. Idempotency | PASS | PASS |
-| B. Throttle headroom | PASS | PASS — 300 × ~900ms ≈ 270s vs 300s maxDuration. Tight (90% utilization); flagged but acceptable because idempotency makes any retry a no-op for already-sent recipients |
+| B. Throttle headroom | PASS | PASS, 300 × ~900ms ≈ 270s vs 300s maxDuration. Tight (90% utilization); flagged but acceptable because idempotency makes any retry a no-op for already-sent recipients |
 | C. Concurrency lock | PASS | PASS |
 | D. DB UNIQUE constraint | PASS | PASS |
-| E. Audience query | PASS | PASS — Gmail-only filter on top of done-tag + Test Account exclusion; 600-cap |
-| E2. scheduledAt freshness | PASS | PASS — T+65m / T+70m |
+| E. Audience query | PASS | PASS, Gmail-only filter on top of done-tag + Test Account exclusion; 600-cap |
+| E2. scheduledAt freshness | PASS | PASS, T+65m / T+70m |
 | F. Rotation safety | PASS | PASS |
 | G. State guards | PASS | PASS |
 | H. HTML patch correctness | **FAIL** | PASS (after fix) |
@@ -119,14 +119,14 @@ Both findings informed the Campaign 1 final variant choice (personalized + lives
 
 ### Blocker caught and fixed before send
 
-**H. HTML patch indentation mismatch.** The script's `FIND` / `REPLACE` constants used 18-space + 20-space indentation for the `<p>` and inner text, but the live parent template's HTML uses 14-space + 16-space indentation. The mismatch came from my prior visual inspection — earlier diagnostic scripts that printed the HTML pre-padded each line with 4 spaces for terminal readability, so the visible indentation was 4 spaces deeper than the actual stored content. The auditor caught this by reading the live parent and counting bytes; the pre-flight check at `addGreetingToChild` would have aborted the whole script before any side effects (no test send, no clone, no schedule), but with no positive output the test wouldn't have run either.
+**H. HTML patch indentation mismatch.** The script's `FIND` / `REPLACE` constants used 18-space + 20-space indentation for the `<p>` and inner text, but the live parent template's HTML uses 14-space + 16-space indentation. The mismatch came from my prior visual inspection, earlier diagnostic scripts that printed the HTML pre-padded each line with 4 spaces for terminal readability, so the visible indentation was 4 spaces deeper than the actual stored content. The auditor caught this by reading the live parent and counting bytes; the pre-flight check at `addGreetingToChild` would have aborted the whole script before any side effects (no test send, no clone, no schedule), but with no positive output the test wouldn't have run either.
 
 **Fix**: dedented both `FIND` and `REPLACE` constants by 4 spaces ([_work/ab-test-personalization-300-300.ts:48-58](../_work/ab-test-personalization-300-300.ts)). Dry-run via `_work/dryrun-patch.ts` confirmed: 1 FIND occurrence in the parent, single greeting in the patched result, html length grew by exactly 195 chars (matching what we removed on 2026-05-13). After the fix the production script ran cleanly: test sends went out, arm A's child was patched correctly, both children scheduled.
 
 ### Lessons recorded
 
 - **Pre-padded HTML dumps are a debugging trap.** When inspecting HTML stored in a JSONB / TEXT column via a diagnostic script that pretty-prints with indentation prefix, the visible whitespace is NOT the source-of-truth whitespace. The auditor now reads the column directly without printing, and counts bytes. Future scripts touching template HTML should use a regex-based patch (whitespace-tolerant) or a byte-count probe before committing the exact-string FIND. The current script's `addGreetingToChild` has the right safeguards (anchor-must-exist + post-patch validation); the fix was to the constant strings only.
-- **Auditor caught a real bug.** First time the audit returned anything other than SAFE on first pass. Worked exactly as intended — read-only investigation found a content issue that pre-flight checks in the script would have caught at runtime, but at the cost of a fully-aborted run with no test output.
+- **Auditor caught a real bug.** First time the audit returned anything other than SAFE on first pass. Worked exactly as intended, read-only investigation found a content issue that pre-flight checks in the script would have caught at runtime, but at the cost of a fully-aborted run with no test output.
 
 ### Outcome
 
@@ -136,11 +136,11 @@ Tests fired immediately to 8 Test Accounts:
 
 Production scheduled, 600 tagged. Pool after fire: Gmail **980** / non-Gmail 0.
 
-A/B results TBD — fires at 19:05Z / 19:10Z. The mature comparison will be: Arm A (personalized) Gmail click rate vs Arm B (un-personalized) Gmail click rate. Combined with Send 4 / Send 5 / Send 6 prior data points, this gives n=300 per condition at this single send + cross-send aggregation.
+A/B results TBD, fires at 19:05Z / 19:10Z. The mature comparison will be: Arm A (personalized) Gmail click rate vs Arm B (un-personalized) Gmail click rate. Combined with Send 4 / Send 5 / Send 6 prior data points, this gives n=300 per condition at this single send + cross-send aggregation.
 
 ---
 
-## 2026-05-15 morning — 199 Gmail + 199 non-Gmail mixed final batch (Send 6)
+## 2026-05-15 morning, 199 Gmail + 199 non-Gmail mixed final batch (Send 6)
 
 **Planned**: 199 Gmail + 199 non-Gmail = 398 total. Variant B parent `db10a687-...`. Gmail child `7af65782-dabf-4b73-899c-cc86f078d9c9` at `2026-05-15T13:15:00Z`, non-Gmail child `9234d152-1598-4ad9-8b6c-9af2364ce6f1` at `2026-05-15T13:20:00Z`. This **exhausts the non-Gmail pool**: after this fires, only 199 non-Gmail subscribers were ever left and all 199 will have been targeted. Future sends will be Gmail-only or require a new audience definition.
 
@@ -163,18 +163,18 @@ A/B results TBD — fires at 19:05Z / 19:10Z. The mature comparison will be: Arm
 **Blockers caught**: none.
 
 **Script change applied as part of this audit**:
-- `_work/schedule-250-250.ts:138` — child name was hardcoded `"250 Gmail @ ..."` even though `nonGmailPicks.length` was already dynamic at :165. Updated Gmail to also use `${gmailPicks.length}` for symmetry. Future runs at any SAMPLE_SIZE label correctly.
+- `_work/schedule-250-250.ts:138`, child name was hardcoded `"250 Gmail @ ..."` even though `nonGmailPicks.length` was already dynamic at :165. Updated Gmail to also use `${gmailPicks.length}` for symmetry. Future runs at any SAMPLE_SIZE label correctly.
 
 **Pool watch (after this send fires)**:
 - Gmail eligible: 1,580 (was 1,779, minus 199 picked)
-- non-Gmail eligible: **0** (was 199, minus 199 picked) — pool exhausted
+- non-Gmail eligible: **0** (was 199, minus 199 picked), pool exhausted
 - Total eligible for future sends in this rotation: 1,580 Gmail-only
 
-**Outcome**: TBD — fires at 13:15Z / 13:20Z. Will record Send 6 stats once mature, alongside aggregate Sends 5+6 (the two un-personalized data points) vs Sends 1-3 (personalized) to nail the personalization-click-rate hypothesis.
+**Outcome**: TBD, fires at 13:15Z / 13:20Z. Will record Send 6 stats once mature, alongside aggregate Sends 5+6 (the two un-personalized data points) vs Sends 1-3 (personalized) to nail the personalization-click-rate hypothesis.
 
 ---
 
-## 2026-05-15 early morning — 250 Gmail + 250 non-Gmail Variant B (Send 5)
+## 2026-05-15 early morning, 250 Gmail + 250 non-Gmail Variant B (Send 5)
 
 **Planned**: 250 Gmail + 250 non-Gmail of Variant B parent `db10a687-...`, scheduled `2026-05-15T10:25:00Z` (Gmail child `8592210e-19a6-4a17-a45e-a89e8c1252cd`) / `2026-05-15T10:30:00Z` (non-Gmail child `a69983eb-f238-4473-8825-a83eb839aeb4`). Second send with the un-personalized template (greeting block removed on 2026-05-13 before Send 4 fired).
 
@@ -197,13 +197,13 @@ A/B results TBD — fires at 19:05Z / 19:10Z. The mature comparison will be: Arm
 
 **Context worth flagging**: Send 4 (the first un-personalized send) showed Gmail open rate steady at 32.4% (in line with personalized sends) but Gmail click count dropped to 1 vs 2-5 on prior sends. Real human click count across the 500-recipient send was ~2 vs ~5-7 for personalized sends. Send 5 is effectively the replication needed to confirm whether the click-rate dip is a real personalization effect or sample variance. Both un-personalized data points will be compared.
 
-**Pool watch**: After Send 5 fires, pool drops to Gmail 1,779 / non-Gmail **199**. The next send (Send 6) is the point where non-Gmail can no longer support a 250 split — Send 6 will be the 199 non-Gmail + 199 Gmail mixed final batch, or Gmail-only from here on.
+**Pool watch**: After Send 5 fires, pool drops to Gmail 1,779 / non-Gmail **199**. The next send (Send 6) is the point where non-Gmail can no longer support a 250 split, Send 6 will be the 199 non-Gmail + 199 Gmail mixed final batch, or Gmail-only from here on.
 
-**Outcome**: TBD — fires at 10:25Z / 10:30Z. Honest Gmail-only figures will be appended after maturity.
+**Outcome**: TBD, fires at 10:25Z / 10:30Z. Honest Gmail-only figures will be appended after maturity.
 
 ---
 
-## 2026-05-13 afternoon — 250 Gmail + 250 non-Gmail Variant B (Send 4)
+## 2026-05-13 afternoon, 250 Gmail + 250 non-Gmail Variant B (Send 4)
 
 **Planned**: 250 Gmail + 250 non-Gmail of Variant B parent template `db10a687-...`, scheduled `2026-05-13T18:50:00Z` (Gmail child `3ac3194f-6d16-4a7b-99f5-664ab919bd94`) / `2026-05-13T18:55:00Z` (non-Gmail child `6f7568be-c7e1-4170-963c-78f54d09e9db`). Eligible pool dropping: 2,978 → 2,478 after this send.
 
@@ -224,13 +224,13 @@ A/B results TBD — fires at 19:05Z / 19:10Z. The mature comparison will be: Arm
 
 **Blockers caught**: none.
 
-**Pool watch**: non-Gmail pool now 699 (was 1,199 at the start of the rotation). At 250/send, it exhausts in ~3 more sends — well before the Gmail pool (2,029 remaining). After non-Gmail is depleted, future sends will either need to be Gmail-only or merge the remaining audiences.
+**Pool watch**: non-Gmail pool now 699 (was 1,199 at the start of the rotation). At 250/send, it exhausts in ~3 more sends, well before the Gmail pool (2,029 remaining). After non-Gmail is depleted, future sends will either need to be Gmail-only or merge the remaining audiences.
 
-**Outcome**: TBD — fires at 18:50Z / 18:55Z. Stats and Gmail-only honest figures appended after maturity.
+**Outcome**: TBD, fires at 18:50Z / 18:55Z. Stats and Gmail-only honest figures appended after maturity.
 
 ---
 
-## 2026-05-13 early morning — 250 Gmail + 250 non-Gmail Variant B
+## 2026-05-13 early morning, 250 Gmail + 250 non-Gmail Variant B
 
 **Planned**: 250 Gmail + 250 non-Gmail of Variant B parent template `db10a687-4233-4313-8431-8d2fa64a15c4` (subject "My upcoming concert and livestream"), sender `Lionel Yu <lionel@musicalbasics.com>`, append-mode click tracking, scheduled `2026-05-13T09:50:00Z` (Gmail child `a42899e3-6e81-4c3d-8058-aaa2b9fe3612`) / `2026-05-13T09:55:00Z` (non-Gmail child `f4bb8497-9428-4718-abfc-1127806428dc`). Third 250/250 send in the Variant B follow-up sequence.
 
@@ -257,12 +257,12 @@ None this run. The previous audit (2026-05-12 evening) caught a stale `scheduled
 
 ### Deferred / accepted risks
 
-- Stale doc-comment in `_work/schedule-250-250.ts:1-10` referencing "600ms throttle, no concurrency lock" — code is current, comment is not. Cosmetic only; flagged for cleanup after the send.
+- Stale doc-comment in `_work/schedule-250-250.ts:1-10` referencing "600ms throttle, no concurrency lock", code is current, comment is not. Cosmetic only; flagged for cleanup after the send.
 - Throttle headroom (75s) is comfortable but not enormous. If Resend p99 latency spikes past ~1000ms per call, a 250-recipient run could brush the 300s ceiling. Watch for retries in Inngest dashboard after the fire.
 
 ### Outcome
 
-TBD — children fire at 09:50Z / 09:55Z. Stats and Gmail-only honest figures will be appended after the send matures.
+TBD, children fire at 09:50Z / 09:55Z. Stats and Gmail-only honest figures will be appended after the send matures.
 
 ### Lessons recorded
 
@@ -272,7 +272,7 @@ confirm the protections continue to hold.
 
 ---
 
-## 2026-05-12 evening — 250 Gmail + 250 non-Gmail Variant B
+## 2026-05-12 evening, 250 Gmail + 250 non-Gmail Variant B
 
 **Planned**: 250 Gmail + 250 non-Gmail recipients of Variant B parent
 template `db10a687-4233-4313-8431-8d2fa64a15c4` (subject "My upcoming
@@ -300,7 +300,7 @@ below were addressed.
 
 ### Blockers caught and fixed before send
 
-1. **Stale `scheduledAt` constants in scheduler script**. `_work/schedule-250-250.ts` lines 27-28 still hardcoded `2026-05-12T02:25:00Z` / `02:30:00Z` from the prior night's run. Both times were already in the past. `step.sleepUntil` with a past `Date` fires immediately — the two children would have fired back-to-back at run time, NOT at the intended 21:25Z / 21:30Z slot. **Fix**: updated the two constants to `21:25:00Z` / `21:30:00Z` before invoking the script. **This is the kind of bug the auditor exists for.** A naïve "run the same script that worked last time" would have re-sent immediately and likely tripped the Resend rate limit during the response window.
+1. **Stale `scheduledAt` constants in scheduler script**. `_work/schedule-250-250.ts` lines 27-28 still hardcoded `2026-05-12T02:25:00Z` / `02:30:00Z` from the prior night's run. Both times were already in the past. `step.sleepUntil` with a past `Date` fires immediately, the two children would have fired back-to-back at run time, NOT at the intended 21:25Z / 21:30Z slot. **Fix**: updated the two constants to `21:25:00Z` / `21:30:00Z` before invoking the script. **This is the kind of bug the auditor exists for.** A naïve "run the same script that worked last time" would have re-sent immediately and likely tripped the Resend rate limit during the response window.
 
 2. **DB UNIQUE constraint status unconfirmed**. The migration file existed in the repo but I had no way to confirm from the repo whether the user had applied it in the Supabase SQL editor. Flagged as `UNKNOWN`. **Fix**: user applied the migration mid-session; verified after-the-fact with the probe insert script that intentionally tries to insert a duplicate row and confirms the unique-violation response.
 
@@ -347,7 +347,7 @@ count for this 500-recipient send is approximately 4** (2 Gmail
 - **Total open/click rates are noise. Lead with Gmail-only.** Verified on 2026-05-12 by breaking down opens and clicks by email-provider domain ([_work/check-opens-by-provider.ts](../_work/check-opens-by-provider.ts), [_work/check-other-domain-clicks.ts](../_work/check-other-domain-clicks.ts)). Findings:
   - Apple iCloud open rate runs 60-86% with ~0% click rate. Apple Mail Privacy Protection prefetches every image on delivery; the open pixel is fired by a privacy proxy, not a human.
   - Yahoo and AOL open rates also heavily prefetched (50-85%).
-  - 100% of clicks from "Other"-bucket domains (`.edu`, `.gov`, law firms, medical, corporate) on 2026-05-12 fired within 5 minutes of send, often 2-3 clicks per recipient. These are inbound URL-safety scanners (Mimecast, Proofpoint, Microsoft SafeLinks, etc.) — not humans.
+  - 100% of clicks from "Other"-bucket domains (`.edu`, `.gov`, law firms, medical, corporate) on 2026-05-12 fired within 5 minutes of send, often 2-3 clicks per recipient. These are inbound URL-safety scanners (Mimecast, Proofpoint, Microsoft SafeLinks, etc.), not humans.
   - **Gmail metrics are the only reliable engagement signal.** Gmail's image proxy doesn't pre-fetch; Gmail tabs don't pre-click. Stable Gmail open rate ~30%, Gmail click rate ~0.8% on this audience.
   - Apple click rate, when non-zero, is also a real human signal (MPP doesn't follow links) but the sample is tiny.
   - When comparing subject lines or sends, only compare Gmail rates. Non-Gmail rates measure scanner aggressiveness, not human interest.
