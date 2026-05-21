@@ -9,9 +9,29 @@ each checklist section reported, what was caught and corrected before
 the send, what was deferred, and the outcome once the send completed.
 
 Add a new entry to this file every time the auditor runs against a
-real send. If the auditor caught nothing, still record it — the
+real send. If the auditor caught nothing, still record it. The
 absence of findings is itself useful data over time, and an empty
 entry shows the audit happened.
+
+---
+
+## 2026-05-21 late afternoon, evening — Campaign 1 FINAL 240+240 (Send 9 + Send 10)
+
+**Planned**: Final Campaign 1 cleanup. Two children of 240 Gmail subscribers each, both clones of Variant B parent `db10a687-...` with the personalization greeting patched in (winning variant from Send 7). Subject "My upcoming concert and livestream". Sender `Lionel Yu <lionel@musicalbasics.com>`, append-mode click tracking. Send A child `20eea907-428d-4e17-b894-2f8b5ca0a2d6` at `2026-05-21T21:00:00Z`. Send B child `a37cc569-8136-431e-bf88-aac6b56c603d` at `2026-05-21T22:00:00Z`. Hour-apart stagger. 
+
+**Audience**: 480 Gmail subscribers eligible (active, not Test Account, not Bounced, not yet tagged `done-belgium-followup-b`). Shuffled deterministically, split 240/240 with explicit overlap assertion. All 480 tagged `done-belgium-followup-b` after schedule. This is the last cohort of Campaign 1; pool of untagged-B subscribers now zero. Full active list is now 100% tagged followup-b.
+
+**Audit at**: `2026-05-21T20:05Z`, ~55 min before Send A fire.
+
+**Verdict**: `SAFE`. No findings, no blockers. All standard sections PASS. Throttle math (240 × ~950ms ≈ 228s vs 300s maxDuration) puts utilization at ~76%, comfortable. HTML patch path proven from Send 8 + Send 7. Concurrency lock with 1-hour stagger gives Send A plenty of time to complete (~4 min real wall-clock) before Send B's sleepUntil expires.
+
+**Outcome**: TBD — fires at 21:00Z / 22:00Z this evening. Will append maturity stats to `docs/CAMPAIGN-1-RESULTS.md` once data is in.
+
+**Notes**: The two prior A/B experiments (Send 7 personalization, Send 8 revival) have fully matured. Mature results:
+- Send 7A (personalized): 105 / 300 = **35.0%** Gmail opens, 2 clicks. Send 7B (un-personalized): 86 / 300 = **28.7%** Gmail opens, 2 clicks. Personalization adds **+6.3pp opens, tied clicks**.
+- Send 8A (Variant A revival to non-openers): 39 / 214 = **18.2%** Gmail opens, 0 clicks. Send 8B (Variant B fresh to non-openers): 58 / 209 = **27.8%** Gmail opens, 0 clicks. Fresh subject beats re-send by **+9.6pp opens** on cold audience.
+
+Both findings informed the Campaign 1 final variant choice (personalized + livestream subject). Full results write-up in [docs/CAMPAIGN-1-RESULTS.md](CAMPAIGN-1-RESULTS.md).
 
 ---
 
