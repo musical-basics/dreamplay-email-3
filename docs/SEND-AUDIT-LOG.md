@@ -15,6 +15,26 @@ entry shows the audit happened.
 
 ---
 
+## 2026-05-23 early morning, Campaign 2 wave 2: 250/250 designed vs plain A/B (Send 13 + Send 14)
+
+**Planned**: Second Campaign 2 wave, same A/B variable as wave 1 (Style 1 designed dark-themed HTML vs Style 2 minimal plain Gmail-style HTML). 250 Gmail subscribers per arm. Arm A child `cf945124-3dba-49c2-be91-7d928a3bacbb` at `2026-05-23T05:52:00Z`. Arm B child `c3562c95-f1cf-4960-bbd4-1ef72f314e13` at `2026-05-23T05:57:00Z`. Same subject "I just finished a piece I started writing 20 years ago", sender lionel@musicalbasics.com, append-mode click tracking. Goal: pool wave 1 + wave 2 to get a 500/500 design-vs-plain comparison with more statistical power than wave 1 alone (wave 1 9.5h opens were 60 vs 70, too close to call).
+
+**Audience**: Active Gmail subscribers tagged `done-belgium-followup-b`, NOT Test Account, NOT Bounced, NOT tagged `done-no-school-today` (i.e. didn't receive wave 1), NOT in the 480 Send 9 / Send 10 (Campaign 1 final yesterday). Eligible pool 2,629, 500 picked with fresh shuffle (seed `20260523052`), split 250/250 disjoint. Tagged `done-no-school-today` after schedule.
+
+**Audit at**: `2026-05-23T05:33Z`, ~19 min before Arm A fire. Setup ran at `05:32Z`, schedule fired at `05:36Z`.
+
+**Verdict**: `SAFE`. No findings, no blockers. All standard sections PASS. Live-DB verification confirmed: both children 250 subscriber_ids each, 500/500 active Gmail, 0 Test Account, 0 Bounced, A∩B=0, A∩(Send9∪Send10)=0, B∩(Send9∪Send10)=0, A∩wave1-recipients=0, B∩wave1-recipients=0. Throttle math (250 × ~900ms ≈ 225s vs 300s maxDuration) at ~75% utilization. **H. HTML em-dash purity: PASS** (both children verified zero em dashes; source HTML files unchanged from wave 1 and re-verified).
+
+Two cosmetic mismatches in the audit framing (throttle was described as 950ms/recipient when actual is 200ms throttle + ~700ms latency = ~900ms; wave 1 tag universe described as 494 when actually 500). Auditor flagged both as immaterial to safety. Same shape as wave 1, which executed cleanly.
+
+**Outcome**: TBD. Both arms fire at 05:52Z / 05:57Z (~01:52 AM / 01:57 AM ET). Honest signal at 24-48h elapsed:
+- Pooled wave 1 + wave 2 designed vs plain Gmail open rate: 500/500 comparison.
+- Total Gmail unsubscribes across wave 2 (wave 1 was 2/500 = 0.4%, normal).
+
+Master log [_work/no-school-today-audience-log.csv](../_work/no-school-today-audience-log.csv) appended with 500 more rows.
+
+---
+
 ## 2026-05-21 evening, Campaign 2 wave 1: 250/250 designed vs plain A/B (Send 11 + Send 12)
 
 **Planned**: First Campaign 2 ("No School Today" composition announcement) production wave. 250 Gmail subscribers per arm. Arm A is the designed dark-themed HTML (Variant B visual language with composition content), child `60f0a5ba-5892-4660-8a0e-e7d906a766ac` at `2026-05-22T00:05:00Z`. Arm B is the minimal plain Gmail-style HTML, child `fbede858-5cd5-4efb-a9d8-0b70e64337ad` at `2026-05-22T00:10:00Z`. Same subject "I just finished a piece I started writing 20 years ago", sender lionel@musicalbasics.com, append-mode click tracking. The A/B variable is HTML design only.
