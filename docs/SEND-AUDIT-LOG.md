@@ -15,6 +15,24 @@ entry shows the audit happened.
 
 ---
 
+## 2026-05-24 late evening, Campaign 2 wave 4: 250/250 SUBJECT A/B continuation (Send 17 + Send 18)
+
+**Planned**: W3 subject A/B continuation. Same designed Style 1 HTML (byte-identical), same control + new subjects, fresh 500 Gmail audience. Goal: pool W3 + W4 for a 500/500 subject read on top of the 250/250 W3 alone. Arm A child `75c5e7c8-c143-419a-9cf5-c2b704f9515e` at `2026-05-24T04:53:00Z` (control subject "I just finished a piece I started writing 20 years ago"). Arm B child `83f8b78c-42b5-4db8-9049-a5e2c7a9923b` at `2026-05-24T04:58:00Z` (new subject "My first new piece in 8 months"). Sender lionel@musicalbasics.com, append-mode click tracking.
+
+**Audience**: Active Gmail subscribers tagged `done-belgium-followup-b`, NOT Test Account, NOT Bounced, NOT tagged `done-no-school-today` (excludes W1+W2+W3 = 1,490-ish recipients), NOT in the 480 C1 final. Eligible pool 1,629 (down from W3's 2,129 since W3 took 500), 500 picked with fresh shuffle (seed `20260524043`), split 250/250 disjoint. Tagged `done-no-school-today` after schedule.
+
+**Also fired**: Two test sends (to 8 Test Accounts each) before the production drafts so user could preview both subject variants in inbox. Test children `10be9fb3-762e-4cbc-aee9-ef5c8eb0b0d6` (control) and `63fadbd6-aacb-426e-b0db-fc5ba439972f` (new) are pre-fired and not part of this audit.
+
+**Audit at**: `2026-05-24T04:48Z`, ~5 min before Arm A fire. Setup ran at `04:45Z`, schedule fired at `04:49Z`. Schedule times bumped from initial 04:43/04:48 to 04:53/04:58 because setup took longer than expected (test sends + 4 clones consumed the original 30-min window).
+
+**Verdict**: `SAFE`. All sections PASS. Auditor verified live: subjects match manifest and differ between arms (no em dash in either); HTML byte-identical between arms (8,825 chars) and byte-identical to source file; sent_history rows = 0 on both production children (no leakage from setup, test children at 8 rows each as expected); `subscriber_ids` of 250 on each; 0 overlap with C1 final 480; 0 overlap with W1+W2+W3+initial-NST done-no-school-today cohort. Throttle headroom ~75%. D. DB UNIQUE constraint applied (verified in prior audits, code 23505).
+
+**Outcome**: TBD. Both arms fire at 04:53Z / 04:58Z (~12:53 AM / 12:58 AM ET Sunday). Honest signal at 24-48h. After W4 matures, pooled W3+W4 will give 500-recipient samples per subject (control vs new), enough to call the subject-line winner without the n=250 noise that affected W3 alone.
+
+Master log appended with 500 more rows.
+
+---
+
 ## 2026-05-24 late evening, Campaign 2 wave 3: 250/250 SUBJECT A/B (Send 15 + Send 16)
 
 **Planned**: First subject-line A/B for Campaign 2. Holds HTML constant (designed Style 1, the same HTML used in W1+W2 Arm A) and varies subject only. Arm A child `3028b13e-aaef-4e28-840a-56e6a533cf09` at `2026-05-24T03:08:00Z` carries the control subject "I just finished a piece I started writing 20 years ago" (same as W1+W2). Arm B child `8e42a918-0e0d-422d-bb57-131c7e0a593c` at `2026-05-24T03:13:00Z` carries the new subject "My first new piece in 8 months" (recency/scarcity framing). 250 Gmail recipients per arm, sender lionel@musicalbasics.com, append-mode click tracking.
