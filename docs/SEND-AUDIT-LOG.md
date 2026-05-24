@@ -15,6 +15,27 @@ entry shows the audit happened.
 
 ---
 
+## 2026-05-24 morning, Campaign 2 wave 6: 250/250 BODY A/B continuation (Send 21 + Send 22)
+
+**Planned**: W5 BODY click-optimization A/B continuation. Same HTML files as W5 (Arm A control-body, Arm B click-opt body), same subject "My first new piece in 8 months", same `/no-school-today` landing-page link. Arm A child `a0a27a36-bf2f-4585-92ac-76db9b4b90f0` at `2026-05-24T10:10:00Z`. Arm B child `ca39e9f2-f07d-4776-92cf-b14f7b67a67c` at `2026-05-24T10:15:00Z`. Fires ~1 hour after W5. Goal: pool W5 + W6 for a 500/500 body-A/B read on opens, clicks (first trackable-click data), and unsubs.
+
+**Audience**: Active Gmail subscribers tagged `done-belgium-followup-b`, NOT Test/Bounced/done-no-school-today (excludes W1+W2+W3+W4+W5 = ~2,490 recipients), NOT in C1 final 480. Eligible pool 629 (down from W5's 1,129 since W5 took 500), 500 picked with fresh shuffle (seed `20260524091`, distinct from W5's `20260524085`), split 250/250 disjoint. Tagged `done-no-school-today` after schedule. Pool is getting thin: only ~129 eligible Gmail subs remain in the followup-b cohort after W6 fires.
+
+**No test sends** this wave: HTML and subject already verified visually in W5 test sends.
+
+**Audit at**: `2026-05-24T09:13Z`, ~57 min before Arm A fire. Setup ran at `09:10Z`, schedule fired at `09:14Z`.
+
+**Verdict**: `SAFE`. All sections PASS. Auditor verified live: subjects identical between A and B ("My first new piece in 8 months"); html_content DIFFERS (Arm B is 1,095 chars longer due to repeated CTA); Arm A has 3 `/no-school-today` hrefs, Arm B has 4; ZERO `youtu.be/` hrefs in either (only an `img.youtube.com` thumbnail src, which is non-clickable); em-dash count 0 on html_content and subject; cross-overlap math run against W1+W2+W3+W4+W5 union AND no-school-today master log AND C1 final 480, all show 0 overlap; throttle headroom ~25%; W5 completed well before 10:10Z W6 start (W5 Arm B finished ~09:34Z) plus the global concurrency lock would serialize anyway.
+
+**Outcome**: TBD. Both arms fire at 10:10Z / 10:15Z (~06:10 AM / 06:15 AM ET Sunday). Honest signals at 24-48h (pooled W5+W6, n=500/500):
+- Per-arm UNIQUE Gmail CLICK RATE on the `/no-school-today` landing page. Headline metric.
+- Per-arm Gmail OPEN rate. Same subject + visual frame, so opens should be ~tied; any delta is preheader/first-paragraph length artifact.
+- Per-arm UNSUBSCRIBE rate.
+
+Master log appended with 500 more rows.
+
+---
+
 ## 2026-05-24 early morning, Campaign 2 wave 5: 250/250 BODY click-opt A/B + first trackable-click landing (Send 19 + Send 20)
 
 **Planned**: First BODY click-optimization A/B for Campaign 2 AND first wave routing the primary CTA through the new `/no-school-today` landing page on belgium.musicalbasics.com instead of a direct youtu.be link. Subject held constant ("My first new piece in 8 months", the W3+W4 challenger). Designed Style 1 visual frame held constant. Arm A child `b8ff9550-83ef-426d-a5ec-7d1364baddc3` at `2026-05-24T09:25:00Z` carries the long-form W1-W4 personal-narrative body (just URLs swapped). Arm B child `419c195b-3a9a-458e-9ee2-250260653fa1` at `2026-05-24T09:30:00Z` carries the click-optimized body: short 1-sentence intro, early "Play No School Today" CTA after the intro, shorter story, repeated "Listen now" CTA after the story, unchanged Belgium tie-in + tickets CTA + sign-off.
