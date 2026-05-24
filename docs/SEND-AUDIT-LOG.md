@@ -15,6 +15,29 @@ entry shows the audit happened.
 
 ---
 
+## 2026-05-24 early morning, Campaign 2 wave 5: 250/250 BODY click-opt A/B + first trackable-click landing (Send 19 + Send 20)
+
+**Planned**: First BODY click-optimization A/B for Campaign 2 AND first wave routing the primary CTA through the new `/no-school-today` landing page on belgium.musicalbasics.com instead of a direct youtu.be link. Subject held constant ("My first new piece in 8 months", the W3+W4 challenger). Designed Style 1 visual frame held constant. Arm A child `b8ff9550-83ef-426d-a5ec-7d1364baddc3` at `2026-05-24T09:25:00Z` carries the long-form W1-W4 personal-narrative body (just URLs swapped). Arm B child `419c195b-3a9a-458e-9ee2-250260653fa1` at `2026-05-24T09:30:00Z` carries the click-optimized body: short 1-sentence intro, early "Play No School Today" CTA after the intro, shorter story, repeated "Listen now" CTA after the story, unchanged Belgium tie-in + tickets CTA + sign-off.
+
+**Why the landing-page swap matters for the data**: Per the project memory `feedback_youtube_clicks_not_tracked`, append-mode click tracking cannot capture clicks on youtu.be destinations because the email tracker only rewrites links to the tracked domain. W1-W4 had a TRUE click rate we couldn't measure. W5 routes through belgium.musicalbasics.com/no-school-today (a thin embed-plus-CTA page deployed today, commits `177f8c8` and `3ad6f28` on belgium-concert-landing-page) which the existing dp-analytics-beacon tracks automatically. So W5 is the first wave where unique clickers will appear in subscriber_events for this campaign.
+
+**Audience**: Active Gmail subscribers tagged `done-belgium-followup-b`, NOT Test Account, NOT Bounced, NOT tagged `done-no-school-today` (excludes W1+W2+W3+W4 = ~1,990 recipients), NOT in the 480 C1 final. Eligible pool 1,129 (down from W4's 1,629 since W4 took 500), 500 picked with fresh shuffle (seed `20260524085`), split 250/250 disjoint. Tagged `done-no-school-today` after schedule.
+
+**Also fired**: Two test sends (8 Test Accounts each) so user could preview both body variants in inbox. Test children `57ec6cea-6902-4bdd-bf52-8aacbb2a5389` (control body) and `f51ef715-f0a8-46c5-9379-cc755be23b75` (click-opt body) are pre-fired and not part of this audit.
+
+**Audit at**: `2026-05-24T09:02Z`, ~23 min before Arm A fire. Setup ran at `08:59Z`, schedule fired at `09:03Z`.
+
+**Verdict**: `SAFE`. All sections PASS. Auditor verified live: subjects identical between A and B as designed; html_content DIFFERS (Arm B is 1,095 chars longer due to the repeated CTA block); Arm A html has 3 `belgium.musicalbasics.com/no-school-today` hrefs (logo, image, primary CTA), Arm B has 4 (logo, image, primary CTA, repeated CTA); ZERO `youtu.be/` hrefs in either child; em-dash count = 0 on both html_content and subject_line; 0 overlap with C1 final 480; 0 overlap with done-no-school-today cohort; throttle headroom ~75% (225s of 300s maxDuration); both children clean (status=draft, scheduled_status=null, sent_history=0 pre-fire).
+
+**Outcome**: TBD. Both arms fire at 09:25Z / 09:30Z (~05:25 AM / 05:30 AM ET Sunday). Honest signals at 24-48h:
+- Per-arm UNIQUE CLICK RATE (Gmail). This is the headline metric for W5 because both arms now route through a tracked landing page. First C2 wave with real click data.
+- Per-arm OPEN rate (Gmail). Same subject + same visual frame between arms, so opens should be similar (any open delta is preheader / first-paragraph copy length artifact).
+- Per-arm UNSUBSCRIBE rate. Watching whether the click-optimized "I want to know what you think" close changes unsub behavior vs the longer reflective close.
+
+Master log appended with 500 more rows. New HTML files committed under _work (gitignored).
+
+---
+
 ## 2026-05-24 late evening, Campaign 2 wave 4: 250/250 SUBJECT A/B continuation (Send 17 + Send 18)
 
 **Planned**: W3 subject A/B continuation. Same designed Style 1 HTML (byte-identical), same control + new subjects, fresh 500 Gmail audience. Goal: pool W3 + W4 for a 500/500 subject read on top of the 250/250 W3 alone. Arm A child `75c5e7c8-c143-419a-9cf5-c2b704f9515e` at `2026-05-24T04:53:00Z` (control subject "I just finished a piece I started writing 20 years ago"). Arm B child `83f8b78c-42b5-4db8-9049-a5e2c7a9923b` at `2026-05-24T04:58:00Z` (new subject "My first new piece in 8 months"). Sender lionel@musicalbasics.com, append-mode click tracking.
