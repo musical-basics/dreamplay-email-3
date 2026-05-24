@@ -15,6 +15,26 @@ entry shows the audit happened.
 
 ---
 
+## 2026-05-24 late evening, Campaign 2 wave 3: 250/250 SUBJECT A/B (Send 15 + Send 16)
+
+**Planned**: First subject-line A/B for Campaign 2. Holds HTML constant (designed Style 1, the same HTML used in W1+W2 Arm A) and varies subject only. Arm A child `3028b13e-aaef-4e28-840a-56e6a533cf09` at `2026-05-24T03:08:00Z` carries the control subject "I just finished a piece I started writing 20 years ago" (same as W1+W2). Arm B child `8e42a918-0e0d-422d-bb57-131c7e0a593c` at `2026-05-24T03:13:00Z` carries the new subject "My first new piece in 8 months" (recency/scarcity framing). 250 Gmail recipients per arm, sender lionel@musicalbasics.com, append-mode click tracking.
+
+**Choice rationale**: Style for W3 set to designed (Style 1) rather than plain (Style 2). Wave 1+2 pooled at 31h showed plain edged designed by ~3-5pp Gmail opens but 2/2 C2 unsubs came from the plain arm. User accepted the small open-rate edge in exchange for zero unsub exposure on this wave. Subject A/B isolates a different lever (recency framing vs time-investment framing) without confounding design.
+
+**Audience**: Active Gmail subscribers tagged `done-belgium-followup-b`, NOT Test Account, NOT Bounced, NOT tagged `done-no-school-today` (excludes W1 and W2 recipients), NOT in the 480 C1 final (Send 9 + Send 10). Eligible pool 2,129, 500 picked with fresh shuffle (seed `20260524025`), split 250/250 disjoint. Tagged `done-no-school-today` after schedule.
+
+**Audit at**: `2026-05-24T03:00Z`, ~8 min before Arm A fire. Setup ran at `02:58Z`, schedule fired at `03:03Z`.
+
+**Verdict**: `SAFE`. All sections PASS. Auditor explicitly verified: subject_line column on each child matches the manifest (A=control, B=new); HTML byte-identical between arms at 8,825 chars confirming HTML is held constant; zero em dash in either html_content or subject_line; 0 overlap with C1 final (480); 0 overlap with the 990 live `done-no-school-today` cohort; D. DB UNIQUE constraint probed live and confirmed firing (`sent_history_campaign_subscriber_unique`, code 23505). Throttle headroom ~75% (225s of 300s maxDuration). 5-min gap between arms covers Arm A wall-clock + concurrency-lock release.
+
+**Outcome**: TBD. Both arms fire at 03:08Z / 03:13Z (~11:08 PM / 11:13 PM ET Saturday). Honest signal at 24-48h:
+- Per-subject Gmail open rate: control vs new. Direct comparison since HTML is constant.
+- Unsub deltas, watching whether plain-style asymmetry from W1+W2 was about plain HTML or about the subject (this controls for HTML, so any unsub delta is subject-attributable).
+
+Master log appended with 500 more rows.
+
+---
+
 ## 2026-05-23 early morning, Campaign 2 wave 2: 250/250 designed vs plain A/B (Send 13 + Send 14)
 
 **Planned**: Second Campaign 2 wave, same A/B variable as wave 1 (Style 1 designed dark-themed HTML vs Style 2 minimal plain Gmail-style HTML). 250 Gmail subscribers per arm. Arm A child `cf945124-3dba-49c2-be91-7d928a3bacbb` at `2026-05-23T05:52:00Z`. Arm B child `c3562c95-f1cf-4960-bbd4-1ef72f314e13` at `2026-05-23T05:57:00Z`. Same subject "I just finished a piece I started writing 20 years ago", sender lionel@musicalbasics.com, append-mode click tracking. Goal: pool wave 1 + wave 2 to get a 500/500 design-vs-plain comparison with more statistical power than wave 1 alone (wave 1 9.5h opens were 60 vs 70, too close to call).
