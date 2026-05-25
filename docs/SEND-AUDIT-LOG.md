@@ -15,6 +15,24 @@ entry shows the audit happened.
 
 ---
 
+## 2026-05-25 afternoon, Campaign 2 wave 10: 250/250 W9 continuation Rach SUBJECT A/B (Send 29 + Send 30)
+
+**Planned**: Continuation of W9 Rach subject A/B. Same Rach gateway-beer body, same `/prelude` link, same two subjects. Goal: pool W9+W10 for a 500/500 read on subject choice. Arm A child `4eeec28c-a2de-4ede-bb7a-52503a1d7b58` at `2026-05-25T18:25:00Z` carries the current "favorite at parties" subject. Arm B child `4b5f9567-9940-4927-8c30-98207dbaaf33` at `2026-05-25T18:30:00Z` carries the bolder "Rachmaninoff's Biggest Banger" subject. Both arms 250 mixed-audience recipients.
+
+**Audience**: Mixed (same shape as W8+W9). Active subscribers, NOT Test/Bounced/done-no-school-today. Eligible pool 1,138 (58 Gmail / 1,080 non-Gmail) post-W9. Picked 500 with seed `20260525181` (distinct from W9's `20260525061`), split 250/250 disjoint. Arm A 12 Gmail / 238 non-Gmail, Arm B 13 Gmail / 237 non-Gmail.
+
+**No test sends**: HTML + subjects identical to W9, user already previewed there.
+
+**Audit at**: `2026-05-25T18:11Z`, ~14 min before Arm A fire. Setup ran at `18:10Z`, schedule fired at `18:13Z`.
+
+**Verdict**: `SAFE`. All sections PASS. Auditor verified live: html_content byte-identical between A and B (both 9,249 chars), subjects differ as expected, em-dash count 0 on both fields, ZERO `youtu.be/` hrefs (3 `/prelude` hrefs on each), 0 overlap with done-NST cohort (now ~4,469 tagged), 0 cross-arm overlap, 0 overlap with W9 children (which are both completed/sent with full 250 rows each). Throttle headroom ~75%.
+
+**Outcome**: TBD. Both arms fire at 18:25Z / 18:30Z (~02:25 PM / 02:30 PM ET Monday, second midday-ET send of the campaign). After W10 matures, pooled W9+W10 will give 500/500 on the subject A/B with Rach body held constant.
+
+Master log appended with 500 more rows.
+
+---
+
 ## 2026-05-25 midday, Campaign 2 wave 9: 250/250 Rach-only SUBJECT A/B, mixed audience (Send 27 + Send 28)
 
 **Planned**: Rach-only wave. Both arms use the IDENTICAL Rach Prelude body (gateway-beer narrative) and link to the `/prelude` landing page. ONLY the subject differs:
