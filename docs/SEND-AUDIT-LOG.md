@@ -15,6 +15,34 @@ entry shows the audit happened.
 
 ---
 
+## 2026-05-25 midday, Campaign 2 wave 9: 250/250 Rach-only SUBJECT A/B, mixed audience (Send 27 + Send 28)
+
+**Planned**: Rach-only wave. Both arms use the IDENTICAL Rach Prelude body (gateway-beer narrative) and link to the `/prelude` landing page. ONLY the subject differs:
+- Arm A child `c92865e2-f81d-4d85-8a55-27a9fe640c02` at `2026-05-25T16:30:00Z` carries the current subject "My favorite piece to play at parties (Prelude in G Minor op 23 no 5)" (the one used in W7/W8 Arm B).
+- Arm B child `93b42634-824d-4676-9991-595485d8cf9f` at `2026-05-25T16:35:00Z` carries the new bolder subject "Rachmaninoff's Biggest Banger (Prelude in G Minor)".
+
+Goal: isolate whether the bolder "Biggest Banger" framing pulls more opens than the personal-anecdote "favorite at parties" framing, given identical body and landing page. The user originally brainstormed both as candidates back at the start of the Rach test.
+
+**Audience**: mixed (Gmail filter still dropped, same shape as W8). Active subscribers, NOT Test/Bounced/done-no-school-today. Eligible pool 1,638 (78 Gmail + 1,560 non-Gmail). 500 picked with seed `20260525061`, split 250/250 disjoint.
+- Arm A: 6 Gmail / 244 non-Gmail
+- Arm B: 14 Gmail / 236 non-Gmail
+- Same caveats as W8: Apple MPP inflates non-Gmail opens, corporate URL scanners can inflate non-Gmail clicks. Per-arm RELATIVE numbers within W9 still meaningful since both arms share noise floor.
+
+**Audit at**: `2026-05-25T16:14Z`, ~16 min before Arm A fire. Setup ran at `16:12Z`, schedule fired at `16:15Z`.
+
+**Verdict**: `SAFE`. All sections PASS. Auditor verified live: html_content is BYTE-IDENTICAL between arms (sha256 9135cd44... on both, 9,249 bytes each, matches source file exactly); subjects differ as expected; em-dash count 0 on both html_content and both subjects (Arm B uses plain ASCII apostrophe in "Rachmaninoff's"); both children carry 3 `/prelude` + 1 `/` hrefs, ZERO `youtu.be/`; 0 overlap with done-NST cohort (now ~4,000 tagged); 0 cross-arm overlap; subscriber_ids arrays length 250 each. Throttle headroom ~75%. D. DB UNIQUE constraint UNKNOWN this run, application-layer idempotency check at route.ts:225-260 is the primary guard.
+
+**Outcome**: TBD. Both arms fire at 16:30Z / 16:35Z (~12:30 PM / 12:35 PM ET Monday — first midday-ET send of the campaign, vs the overnight pattern of W1-W8). Honest signals at 24-48h:
+- Per-arm OPEN rate. Same body + landing page + audience composition between arms, so any open delta is purely subject-attributable. The clean test we couldn't do before because earlier waves changed multiple variables at once.
+- Per-arm CLICK rate. Should be roughly the same if the subjects pull comparable open volume and the body+landing-page do the click work. Big asymmetry would suggest the subject also affects post-open intent.
+- Per-arm UNSUB rate. Watching whether "Biggest Banger" framing pushes unsubs up vs the more reserved "favorite at parties."
+
+Also fired test sends: children `c49e8b0b-3280-47bc-a476-81fbc21a1764` (Arm A test) and `0858bc4a-35a7-470a-9d20-89a784164872` (Arm B test), 8 Test Accounts each, so user could preview both subjects in inbox before production fire.
+
+Master log appended with 500 more rows.
+
+---
+
 ## 2026-05-25 early morning, Campaign 2 wave 8: 250/250 W7 continuation, MIXED audience (Send 25 + Send 26)
 
 **Planned**: Continuation of W7's NST control vs Rach Prelude two-variant test. Same HTML files, same subjects, same landing-page links. Arm A child `c6621780-9bd6-4b96-abab-7a3e0c5b269d` at `2026-05-25T05:30:00Z`. Arm B child `4c80c890-9785-46a0-a676-462328a35121` at `2026-05-25T05:35:00Z`. Goal: pool W7 + W8 for a 500/500 read on the two-variant comparison, with the caveat that W8 is mostly non-Gmail.
