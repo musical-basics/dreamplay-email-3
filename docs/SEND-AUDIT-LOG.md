@@ -15,6 +15,33 @@ entry shows the audit happened.
 
 ---
 
+## 2026-05-25 late evening, Campaign 2 wave 7: 250/250 TWO-VARIANT test (NST control vs Rach Prelude) (Send 23 + Send 24)
+
+**Planned**: First C2 wave to test two ENTIRELY DIFFERENT emails head-to-head (different subject + body + landing page). Arm A child `7bb3efd8-2340-4e5f-b8c4-7482264443a0` at `2026-05-25T03:00:00Z` is the W5/W6 Arm A NST control (subject "My first new piece in 8 months", long-narrative body, links to `/no-school-today`). Arm B child `58b8f58f-afc5-40c0-8ad8-9f47598049ad` at `2026-05-25T03:05:00Z` is brand new: subject "My favorite piece to play at parties (Prelude in G Minor op 23 no 5)", new "gateway beer of classical music" body about Rachmaninoff Prelude in G Minor, links to the new `/prelude` landing page (deployed today on belgium-concert-landing-page commit `06b2441`, sibling to `/no-school-today`). Both arms mention Belgium concert + the other piece for cross-context.
+
+**Why this design**: W5+W6 showed the click-opt body LOST to control body ~4× on clicks, so dropping click-opt for good. Trying a much different angle: pivot to the Rach Prelude as the "hook piece" while still mentioning No School Today. Headline question: does the recognizable-virtuoso angle pull better engagement (opens + clicks + concert CTA bumps) than the personal-narrative angle that's been our baseline?
+
+**Audience changes for W7** (notable):
+- Dropped `done-belgium-followup-b` filter (no-op anyway: 5,616 of 5,624 active subs have it, only Test Accounts don't).
+- Dropped C1 final 480 exclusion. C1 fired 2026-05-21 = 4 days ago, past the same-week-cadence concern. Without this drop only 129 eligible; with it, 604 eligible.
+- ~391 of the 500 picked are in C1 final (got an email 4 days ago, will get this one). Intentional this wave.
+- Otherwise standard: active Gmail, not Test/Bounced/done-no-school-today.
+
+**Audit at**: `2026-05-25T02:35Z`, ~25 min before Arm A fire. Setup ran at `02:34Z` (first attempt hit the 129-eligibility floor and threw; updated to drop C1 final exclusion and re-ran at `02:34Z` successfully). Schedule fired at `02:38Z`.
+
+**Verdict**: `SAFE`. All sections PASS. Auditor verified live: zero `youtu.be/` hrefs in either child; Arm B uses the new `img.youtube.com/vi/Bjouy1XpO9M/maxresdefault.jpg` thumbnail (Rach video) while Arm A still uses `y3SZI2AM0Uc` (NST video); subjects DIFFER between A and B; html_content differs substantially (A=8,902 bytes, B=9,249 bytes); em-dash count 0 on both html_content and both subjects; 0 overlap with done-NST cohort (~3,000); 0 cross-arm overlap; ~391 C1 final overlap explicitly acknowledged as intentional. Throttle headroom ~75% (225s of 300s). D. DB UNIQUE constraint verified live (code 23505).
+
+**Outcome**: TBD. Both arms fire at 03:00Z / 03:05Z (~11:00 PM / 11:05 PM ET Sunday). Headline metrics at 24-48h:
+- Per-variant Gmail open rate. Different subjects, so opens are the primary subject test.
+- Per-variant unique Gmail CLICK rate (both arms route through tracked landing pages). Different bodies + different landing pages, so clicks are the primary body+page test.
+- Per-variant unsubscribe rate. Watching whether the bolder Rach framing pushes unsubs up.
+
+Also fired test sends (children `31b6a0fa-9d3c-4301-91c7-63607bf74e11` and `4a39d30e-e087-47f8-82c1-023df5a6b3f1`, 8 Test Accounts each) so user could preview both variants pre-fire.
+
+Master log appended with 500 more rows.
+
+---
+
 ## 2026-05-24 morning, Campaign 2 wave 6: 250/250 BODY A/B continuation (Send 21 + Send 22)
 
 **Planned**: W5 BODY click-optimization A/B continuation. Same HTML files as W5 (Arm A control-body, Arm B click-opt body), same subject "My first new piece in 8 months", same `/no-school-today` landing-page link. Arm A child `a0a27a36-bf2f-4585-92ac-76db9b4b90f0` at `2026-05-24T10:10:00Z`. Arm B child `ca39e9f2-f07d-4776-92cf-b14f7b67a67c` at `2026-05-24T10:15:00Z`. Fires ~1 hour after W5. Goal: pool W5 + W6 for a 500/500 body-A/B read on opens, clicks (first trackable-click data), and unsubs.
