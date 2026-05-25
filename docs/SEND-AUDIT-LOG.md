@@ -15,6 +15,35 @@ entry shows the audit happened.
 
 ---
 
+## 2026-05-25 early morning, Campaign 2 wave 8: 250/250 W7 continuation, MIXED audience (Send 25 + Send 26)
+
+**Planned**: Continuation of W7's NST control vs Rach Prelude two-variant test. Same HTML files, same subjects, same landing-page links. Arm A child `c6621780-9bd6-4b96-abab-7a3e0c5b269d` at `2026-05-25T05:30:00Z`. Arm B child `4c80c890-9785-46a0-a676-462328a35121` at `2026-05-25T05:35:00Z`. Goal: pool W7 + W8 for a 500/500 read on the two-variant comparison, with the caveat that W8 is mostly non-Gmail.
+
+**Audience change (intentional trade-off)**: Gmail-only pool is exhausted (~103 eligible Gmail after W7). User accepted dirtier signal for bigger sample. Dropped Gmail filter. Resulting mix:
+- Arm A: 15 Gmail / 235 non-Gmail
+- Arm B: 11 Gmail / 239 non-Gmail
+- Total: 26 Gmail / 474 non-Gmail across both arms
+
+Per project memory: Apple MPP inflates opens for Apple recipients, corporate URL scanners can inflate clicks for non-Gmail. So W8 opens and clicks should NOT be directly compared to W1-W7 numbers. The W7-vs-W8 same-arm comparison will quantify the inflation, which is useful in itself.
+
+**Audience filter**: active subscribers (ALL domains), NOT Test Account, NOT Bounced, NOT tagged done-no-school-today. C1 final exclusion still dropped (now 5 days post-fire). Eligible pool 2,138 (104 Gmail + 2,034 non-Gmail). 500 picked with seed `20260525051`, split 250/250 disjoint.
+
+**No test sends** this wave: HTML and subjects identical to W7.
+
+**Audit at**: `2026-05-25T05:22Z`, ~8 min before Arm A fire. Setup ran at `05:19Z`, schedule fired at `05:23Z`.
+
+**Verdict**: `SAFE`. All sections PASS. Auditor verified live: zero `youtu.be/` hrefs in either child; subjects differ as expected; html_content differs substantially (A=8,902 bytes / B=9,249 bytes); em-dash count 0 on both html_content and both subjects; 0 overlap with done-NST cohort (~3,500 tagged); 0 cross-arm overlap; Gmail mix matches expectation (A=6.0%, B=4.4%); W7 children both completed at 03:07Z so no concurrency lock contention; throttle headroom ~75% (225s of 300s maxDuration). D. DB UNIQUE constraint UNKNOWN this run (no exec_sql RPC available) but application-layer idempotency check at route.ts:219-260 is the primary guard.
+
+**Outcome**: TBD. Both arms fire at 05:30Z / 05:35Z (~01:30 AM / 01:35 AM ET Monday). Honest signals at 24-48h:
+- Per-variant open rate, with mandatory caveat that ~95% of recipients are non-Gmail and many are Apple (MPP-prefetched opens look artificially high)
+- Per-variant click rate, also caveat for corporate URL scanners on enterprise domains
+- **Most useful cross-wave comparison**: same-arm W7 (Gmail) vs W8 (mostly non-Gmail) opens/clicks deltas, to quantify what non-Gmail noise actually looks like in this audience
+- Per-variant unsub rate (this metric is provider-agnostic and clean)
+
+Master log appended with 500 more rows.
+
+---
+
 ## 2026-05-25 late evening, Campaign 2 wave 7: 250/250 TWO-VARIANT test (NST control vs Rach Prelude) (Send 23 + Send 24)
 
 **Planned**: First C2 wave to test two ENTIRELY DIFFERENT emails head-to-head (different subject + body + landing page). Arm A child `7bb3efd8-2340-4e5f-b8c4-7482264443a0` at `2026-05-25T03:00:00Z` is the W5/W6 Arm A NST control (subject "My first new piece in 8 months", long-narrative body, links to `/no-school-today`). Arm B child `58b8f58f-afc5-40c0-8ad8-9f47598049ad` at `2026-05-25T03:05:00Z` is brand new: subject "My favorite piece to play at parties (Prelude in G Minor op 23 no 5)", new "gateway beer of classical music" body about Rachmaninoff Prelude in G Minor, links to the new `/prelude` landing page (deployed today on belgium-concert-landing-page commit `06b2441`, sibling to `/no-school-today`). Both arms mention Belgium concert + the other piece for cross-context.
