@@ -15,6 +15,31 @@ entry shows the audit happened.
 
 ---
 
+## 2026-05-26 early morning, Campaign 2 wave 11: 250/250 FUR ELISE subject A/B (Send 31 + Send 32)
+
+**Planned**: Brand new email variant - Fur Elise "three ways" (1 min classical / 1 min heroic / 1 min dubstep nightmare). Both arms use the same new body (`_work/fur-elise-w11.html`) and link to the new `/fur-elise` landing page (deployed today on belgium-concert-landing-page, commit `b090448`). SUBJECT-only A/B:
+- Arm A child `fbcaebbb-a81e-4eec-a577-4b4db0f9afac` at `2026-05-26T08:30:00Z`, subject "They said 'Fur Elise' is boring, so I played this" (confrontational/curiosity hook)
+- Arm B child `f99005d5-314b-4d8b-b254-adbe0c1012ea` at `2026-05-26T08:35:00Z`, subject "If Beethoven Wrote Fur Elise In 2026..." (modern reimagining angle)
+
+This is the third entirely-new email variant in C2 (after NST in W1-W6 and Rach Prelude in W7-W10). Body framing: invite the reader to forward to anyone they know who thinks classical music is boring. Concert tie-in mentions Fur Elise Nightmare in the program alongside the other Nightmare arrangements + No School Today + Rach Prelude.
+
+**Audience**: Mixed (same shape as W8-W10). Active subscribers, NOT Test/Bounced/done-no-school-today. No followup-b filter, no C1 final exclusion (now 5 days post-C1). Eligible pool 638 (33 Gmail / 605 non-Gmail) - this is essentially the last viable 250/250 wave for the campaign without re-targeting. Picked 500 with seed `20260526075`, split 250/250 disjoint. Arm A 9 Gmail / 241 non-Gmail. Arm B 17 Gmail / 233 non-Gmail.
+
+**Audit at**: `2026-05-26T08:06Z`, ~24 min before Arm A fire. Setup ran at `08:03Z`, schedule fired at `08:07Z`.
+
+**Verdict**: `SAFE`. All sections PASS. Auditor verified live: html_content byte-identical between arms (sha256 daf08da2..., 9,333 bytes each); subjects DIFFER and the special characters are ASCII (apostrophes 0x27 not curly 0x2018/0x2019; "..." is three ASCII dots not Unicode U+2026 ellipsis); em-dash count 0 on html and both subjects; ZERO `youtu.be/` clickable hrefs (1 `img.youtube.com` thumbnail for `40ruweRl54k` is the non-clickable image src as expected); 5 hrefs per child (3 `/fur-elise` + 1 `/` + 1 `{{unsubscribe_url}}`); 0 overlap with done-NST cohort (~4,969 tagged); 0 cross-arm overlap.
+
+**Outcome**: TBD. Both arms fire at 08:30Z / 08:35Z (~04:30 AM / 04:35 AM ET Tuesday). Honest signals at 24-48h:
+- Per-arm OPEN rate. Direct subject comparison since body + landing identical. Hypothesis: "boring + curiosity" subject pulls more opens than "2026 reimagining"; counter-hypothesis: the ellipsis curiosity gap may match. Also a cross-wave comparison against Rach (W7-W10) and NST (W1-W6) at the body level.
+- Per-arm CLICK rate. With same body + landing both arms should have similar CTR, BUT the "boring" subject may attract a more skeptical opener less likely to click through.
+- Per-arm UNSUB rate. The confrontational tone of Arm A subject may push unsubs higher than the more neutral Arm B.
+
+Also fired test sends (children `ffd0c6de-9bd1-457e-8cc3-0db9afc33cd6` for Arm A, `53f3417d-a656-4b98-8279-e3303d993ef7` for Arm B) so user could preview both subjects pre-fire.
+
+Master log appended with 500 more rows.
+
+---
+
 ## 2026-05-25 afternoon, Campaign 2 wave 10: 250/250 W9 continuation Rach SUBJECT A/B (Send 29 + Send 30)
 
 **Planned**: Continuation of W9 Rach subject A/B. Same Rach gateway-beer body, same `/prelude` link, same two subjects. Goal: pool W9+W10 for a 500/500 read on subject choice. Arm A child `4eeec28c-a2de-4ede-bb7a-52503a1d7b58` at `2026-05-25T18:25:00Z` carries the current "favorite at parties" subject. Arm B child `4b5f9567-9940-4927-8c30-98207dbaaf33` at `2026-05-25T18:30:00Z` carries the bolder "Rachmaninoff's Biggest Banger" subject. Both arms 250 mixed-audience recipients.
