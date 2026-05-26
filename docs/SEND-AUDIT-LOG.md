@@ -15,6 +15,41 @@ entry shows the audit happened.
 
 ---
 
+## 2026-05-26 afternoon, Campaign 2 wave 12: 4x250 FUR ELISE RETARGETING done-NST cohort (Send 33-36)
+
+**Planned**: First retargeting wave. Re-hits subscribers who got any C2 email (W1-W10) with the Fur Elise variant they haven't seen yet. First C2 wave to split into 4 chunks of 250 instead of 2 chunks of 250, both for spam-filter safety and to stay well under Vercel maxDuration per child.
+
+**Setup**:
+- Retroactively tagged W11's 500 recipients with `done-fur-elise` BEFORE setup (so they don't re-target themselves). Done via `_work/tag-w11-fur-elise.ts`.
+- Audience filter: `active` + tagged `done-no-school-today` + NOT `done-fur-elise` + NOT `Test Account` + NOT `Bounced`. Eligible pool 4,960.
+- Picked 1,000 with seed `20260526194`, split into 4 disjoint chunks of 250 (cross-chunk overlap verified zero pairwise).
+
+**Schedule** (interleaved, gaps spread Resend load + give concurrency lock breathing room):
+- A1 child `507808a2-9ebb-48a0-a0c4-919395380bc6` at `2026-05-26T20:10:00Z` — subject "They said 'Fur Elise' is boring, so I played this"
+- B1 child `ec6de553-4ce0-4c2b-99f8-6576ce790d0f` at `2026-05-26T20:15:00Z` — subject "If Beethoven Wrote Fur Elise In 2026..."
+- A2 child `1e1db20e-7cd2-458b-840f-89c23387786f` at `2026-05-26T20:25:00Z` — same as A1 subject
+- B2 child `18007f0d-fad3-4d60-ab2c-2067dc9890c2` at `2026-05-26T20:30:00Z` — same as B1 subject
+
+Each child = 250 recipients = ~225s wall-clock. 5-min and 10-min staggers are sufficient for the global concurrency lock to serialize them (locks have ~75s headroom on the 5-min gaps, which is fine).
+
+**Audit at**: `2026-05-26T19:49Z`, ~21 min before A1 fire. Setup ran at `19:47Z`, schedule fired at `19:51Z`.
+
+**Verdict**: `SAFE`. All sections PASS. Auditor verified live: all 4 children have BYTE-IDENTICAL html_content (sha256 `daf08da20cf4c7631042736abbd88cfc23106b9415fe8e99eb34a424f786ee9c`, 9,333 bytes) matching `_work/fur-elise-w11.html`; A1+A2 carry identical subject (ASCII apostrophes, no curly), B1+B2 carry identical subject (three ASCII dots, no Unicode ellipsis); A* differs from B*; zero em dashes anywhere; zero `youtu.be/` hrefs; cross-chunk disjointness verified pairwise (all 6 pair intersections = 0, union = 1,000); zero overlap with the 500-strong `done-fur-elise` cohort (proving the W11 retroactive tagging worked + the filter is correct); D. DB UNIQUE constraint verified live (code 23505 on duplicate insert probe).
+
+Auditor caveat (cosmetic, not blocking): 5-min gaps have ~75s headroom over expected child wall-clock. If Resend latency spikes, next-in-line child may sit queued in Inngest behind the lock briefly; safe but means actual fire times may drift slightly past nominal slots.
+
+After successful schedule, all 1,000 recipients were bulk-tagged `done-fur-elise` (2 batches of 500 each via API). This is the idempotency tag for the Fur Elise retargeting series — future Fur Elise waves filter by NOT done-fur-elise.
+
+**Outcome**: TBD. Both arms fire over 20-minute window starting 20:10Z (~04:10 PM ET Tuesday). Honest signals at 24-48h (1000 total recipients = 500 per subject, biggest single A/B sample in the campaign):
+- Per-subject open rate. Will firm up W11's directional finding (B "2026" leads opens at 11h).
+- Per-subject CTR. Will firm up W11's directional finding (A "boring" leads CTR ~2× at 11h).
+- Per-subject unsub rate, especially among the retargeted cohort who have already seen NST or Rach Prelude. Higher cumulative unsub risk than W11 because these recipients are on their 2nd+ C2 email.
+- Concurrency lock behavior: first 4-chunk schedule, watching whether all 4 complete cleanly within their nominal slots.
+
+Master log appended with 1,000 more rows.
+
+---
+
 ## 2026-05-26 early morning, Campaign 2 wave 11: 250/250 FUR ELISE subject A/B (Send 31 + Send 32)
 
 **Planned**: Brand new email variant - Fur Elise "three ways" (1 min classical / 1 min heroic / 1 min dubstep nightmare). Both arms use the same new body (`_work/fur-elise-w11.html`) and link to the new `/fur-elise` landing page (deployed today on belgium-concert-landing-page, commit `b090448`). SUBJECT-only A/B:
