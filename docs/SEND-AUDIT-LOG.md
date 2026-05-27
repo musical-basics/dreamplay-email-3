@@ -15,6 +15,38 @@ entry shows the audit happened.
 
 ---
 
+## 2026-05-27 early morning, Campaign 2 wave 13: 4x250 FUR ELISE PREHEADER A/B retargeting (Send 37-40)
+
+**Planned**: Pivot of the Fur Elise retargeting test variable. W11+W12 (750/750) showed the subject test directionality is locked: "boring" wins CTR by 1.5x, "2026" wins opens by +1.2pp, unsubs nearly tied. Continuing the subject A/B is low-learning. Pivoting to test PREHEADER text (untested variable in C2). Locked subject = winner on CTR: "They said 'Fur Elise' is boring, so I played this".
+
+**A/B variable**: preheader text (the hidden inbox-preview text that Gmail shows after the subject).
+- Arm A (control): `fur-elise-w11.html` as-is, no preheader. Gmail picks the first body sentence as preview.
+- Arm B (with preheader): `fur-elise-w13-arm-b-preheader.html` adds a hidden `<div style="display:none">` at the top of `<body>` containing "Classical to dubstep in 3 minutes." plus `&nbsp;&zwnj;` pad characters to push past the default snippet (industry-standard Litmus/Mailchimp pattern).
+
+**Children to audit (all 4 use the same locked subject)**:
+- A1 no-preheader child `47e5ca82-0175-44f1-b614-37d850e9d7da` at `2026-05-27T07:40:00Z`
+- B1 with-preheader child `08923eb5-ef0b-496f-81c9-f8bc103e05b0` at `2026-05-27T07:45:00Z`
+- A2 no-preheader child `6ac9d748-8727-4b60-ad29-07d56928b406` at `2026-05-27T07:55:00Z`
+- B2 with-preheader child `3f92aaaa-1fa8-4e47-92d7-02522f702d6d` at `2026-05-27T08:00:00Z`
+
+Schedule pattern same as W12 (5/10/5-min staggered chunks). Each child 250 recipients, well under 300s maxDuration.
+
+**Audience**: active + tagged `done-no-school-today` + NOT `done-fur-elise` + NOT Test/Bounced. Eligible pool 3,960 (down from 4,960 since W12 took 1,000). Picked 1,000 with seed `20260527051`, split 4 disjoint chunks of 250. After fire, all 1,000 tagged `done-fur-elise`.
+
+**Audit at**: `2026-05-27T07:29Z`, ~11 min before A1 fire. Setup ran at `07:26Z`, schedule fired at `07:30Z`.
+
+**Verdict**: `SAFE`. All sections PASS. Auditor verified live: A1.html_content === A2.html_content (sha256 `daf08da2...` both 9,333 bytes, no preheader); B1.html_content === B2.html_content (sha256 `8723493e...` both 9,921 bytes, with preheader); A vs B differ by exactly the 588-byte preheader div; ALL 4 subjects identical with ASCII apostrophes (0x27); em-dash count 0 everywhere; zero `youtu.be/` hrefs; "Classical to dubstep in 3 minutes." present in B1+B2 only; cross-chunk disjointness verified (6 pair intersections = 0); zero overlap with the 1,496 `done-fur-elise`-tagged cohort. Throttle headroom 75%. Auditor explicitly noted the `&nbsp;&zwnj;` padding pattern is industry-standard and low spam-filter risk; caveat to watch for is if Arm B opens come in materially lower than Arm A (would signal pad-char penalty).
+
+**Outcome**: TBD. All 4 fire over 20-min window starting 07:40Z (~03:40 AM ET Wednesday). Honest signals at 24-48h:
+- Per-arm OPEN rate. Direct preheader effect since body, subject, audience are otherwise identical. Hypothesis: preheader adds a second inbox-preview hook and lifts opens.
+- Per-arm CTR. Should be similar (body+landing unchanged) unless preheader pre-qualifies a different reader.
+- Per-arm UNSUB rate. Should be similar across arms.
+- Anti-signal to watch: if Arm B opens drop significantly, the pad-char technique is being penalized (revisit before W14).
+
+Master log appended with 1,000 more rows.
+
+---
+
 ## 2026-05-26 afternoon, Campaign 2 wave 12: 4x250 FUR ELISE RETARGETING done-NST cohort (Send 33-36)
 
 **Planned**: First retargeting wave. Re-hits subscribers who got any C2 email (W1-W10) with the Fur Elise variant they haven't seen yet. First C2 wave to split into 4 chunks of 250 instead of 2 chunks of 250, both for spam-filter safety and to stay well under Vercel maxDuration per child.
