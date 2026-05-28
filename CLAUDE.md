@@ -55,14 +55,15 @@ Always run `date -u` before scheduling a send or computing a scheduled-at value.
 - Always honor the campaign's idempotency tag (e.g., `done-belgium-followup-b`). The done-tag pattern is the audience-side complement to `sent_history`, it keeps subscribers from being re-targeted across separate scheduler runs.
 - For follow-up sends, the audience query should always be "active subscribers, not done-tagged, not test-tagged."
 
-#### Consent policy for Belgium concert outreach (Benelux + N-France)
+#### Consent policy for Belgium concert outreach (Benelux + N-France + UK + Germany)
 
-Standing exception, set 2026-05-27 by Lionel: for the June 11 2026 Belgium concert outreach campaign specifically, the consent bar is **"did not unsubscribe"** rather than **"actively opted in"**. This means:
+Standing exception, set 2026-05-27 by Lionel, extended 2026-05-28 to UK + Germany: for the June 11 2026 Belgium concert outreach campaign specifically, the consent bar is **"did not unsubscribe"** rather than **"actively opted in"**. This means:
 
-- INCLUDE: Shopify customers with `Accepts Marketing = no` (tagged `consent:none` in our SQLite staging DBs), and Omnisend `Non-subscribed` contacts, as long as they live in Belgium / Netherlands / Luxembourg / Northern France.
+- INCLUDE: Shopify customers with `Accepts Marketing = no` (tagged `consent:none` in our SQLite staging DBs), and Omnisend `Non-subscribed` contacts, as long as they live in Belgium / Netherlands / Luxembourg / Northern France / UK / Germany (all train-or-short-flight accessible to Brussels).
 - EXCLUDE: anyone tagged `consent:revoked` (Omnisend `Unsubscribed`), anyone with Supabase status in {`unsubscribed`, `bounced`, `inactive`, `deleted`}, anyone with a `done-*` tag for this campaign.
-- Rationale: existing customer/contact relationship + geographic relevance + one-off concert announcement (not recurring marketing). This is *not* a precedent for general MusicalBasics newsletter sends, which still require `consent:marketing`.
-- Audience-builder query for this campaign: `geo:{belgium|netherlands|luxembourg|fr-north} AND NOT consent:revoked AND NOT done:belgium-2026-06-11-* AND NOT supabase.status IN {non-active}`.
+- Rationale: existing customer/contact relationship + geographic relevance to the venue (Eurostar from London ~2h, ICE from Cologne ~1h45) + one-off concert announcement (not recurring marketing). UK/DE extension justified by 2026-05-27 data point: Diana Krilova (UK, `consent:none` in Omnisend) signed up via Shopify and converted to a VIP ticket on the same day, organically.
+- This is *not* a precedent for general MusicalBasics newsletter sends, which still require `consent:marketing`. It is also *not* a precedent for further geographic expansion (Italy/Spain/Eastern Europe stay on `consent:marketing` only unless Lionel re-opens this).
+- Audience-builder query for this campaign: `geo:{belgium|netherlands|luxembourg|fr-north|uk|germany} AND NOT consent:revoked AND NOT done:belgium-2026-06-11-* AND NOT supabase.status IN {non-active}`.
 
 ### Destructive operations
 

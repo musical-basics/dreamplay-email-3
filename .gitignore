@@ -23,4 +23,8 @@ next-env.d.ts
 
 # local working files (subscriber CSVs, scratch data — contain PII)
 /_work
+# root-level data files (Shopify/Omnisend/Wix exports, staging SQLite DBs — PII)
+/*.csv
+/*.db
+/*.xlsx
 
