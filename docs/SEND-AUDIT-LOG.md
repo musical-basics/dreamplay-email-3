@@ -15,6 +15,43 @@ entry shows the audit happened.
 
 ---
 
+## 2026-05-30 midday, Belgium concert trailer A/B wave 2: 8x250 SHORT vs LONG (Send 57-64)
+
+**Planned**: Second wave of the same body-length A/B test. Wave 1 (4000) fired cleanly at 14:00Z and gave directional Short-wins-opens signal (+4.2pp aggregate, Short wins all 8 paired chunk-vs-chunk comparisons). User wants to widen the sample with another 1k/1k for more confidence before deciding on wave 3. Same subject, same hero, same LP, same email bodies as wave 1, no code changes other than `SUBSAMPLE_PER_ARM` 2000 to 1000 and `SCHEDULED_FIRST_FIRE` 14:00Z to 16:30Z.
+
+**A/B variable**: body length only. Subject, hero, click destinations, CTAs all identical to wave 1.
+
+**Audience**: same 8931 pool. Wave 1 done-tagged 4000 (verified live at audit time). Pool after done-tag filter = 4931. Hash-sort ASC + first-1000-per-arm selects positions 2000..2999 within each arm (mathematically disjoint from wave 1 by deterministic SHA256 + sort).
+
+**Children to audit (all 8, same subject + Variant B parent)**:
+- A1 short #1 `e7498429-efc9-4065-8018-5c830ac9749e` @ `2026-05-30T16:30:00Z`
+- B1 long  #1 `93d7d2b6-b9f1-4932-bbbb-f61836db18c5` @ `2026-05-30T16:34:00Z`
+- A2 short #2 `3da575cc-faea-4668-ac2c-80c95f296d71` @ `2026-05-30T16:38:00Z`
+- B2 long  #2 `7cedf4ef-c7ab-45c1-8804-619eed34eaa8` @ `2026-05-30T16:42:00Z`
+- A3 short #3 `52ee1ad3-e665-4c94-9bb9-16bcdc68d11e` @ `2026-05-30T16:46:00Z`
+- B3 long  #3 `fedf2c6b-8909-46db-ba3b-a2cfa4217ac6` @ `2026-05-30T16:50:00Z`
+- A4 short #4 `3281e10f-3298-4d2e-b64a-7fead1c3cd48` @ `2026-05-30T16:54:00Z`
+- B4 long  #4 `b2bb5594-6a27-46e7-8aa8-ef5e69d9faa3` @ `2026-05-30T16:58:00Z`
+
+Pattern: 8 chunks of 250, interleaved A/B, 240s `scheduledAt` stagger. Real wall-clock under global send-lock ~30-40 min total, all 8 expected to complete by ~17:10Z.
+
+**Audit at**: `2026-05-30T16:00Z`, ~30 min before first fire. Re-audit of the same script that cleared wave 1; only two constants changed (SUBSAMPLE_PER_ARM, SCHEDULED_FIRST_FIRE). Auditor confirmed live: 4000 subs currently carry `done-belgium-trailer-2026-05-30` tag matching wave-1 ledger; getDoneTagged() will drop them at script start; remaining pool 4931 sub-sampled correctly to 1000/arm.
+
+**Verdict**: `SAFE`. All sections PASS. Same carried caveats as wave 1: D (DB UNIQUE constraint not re-queried, app-level filter is primary guard) and STAGGER_SEC=240 vs per-child ~225s wall-clock so stagger is execution-order hint not interrupt window.
+
+**Outcome**: TBD. Honest signals to watch at 24-48h on wave-1 + wave-2 combined (6000 sent total, 3000 per arm):
+
+- **Per-arm Gmail-only OPEN rate**: more statistical power with 3000/arm. If Short still leads by 3-5pp, A/B winner is locked.
+- **Per-arm CTR to /concert-trailer**: clicks are still small numbers (wave-1: short 7, long 5). Combined sample needed for confidence.
+- **Per-arm UNSUB rate**: wave 1 tied at 0.35%. Watch whether Long unsubs creep up as the message reaches more inactive segments.
+- **No regressions expected**: wave-1 fired clean (0 spam complaints, 0 bounces).
+
+Wave 3 holds 2931 net-new recipients. Same script, same idempotency, fires when user gives the word.
+
+Master log entry: 2000 more rows tagged `done-belgium-trailer-2026-05-30` post-fire. Total tagged after wave 2 = 6000.
+
+---
+
 ## 2026-05-30 early morning, Belgium concert trailer A/B wave 1: 16x250 SHORT vs LONG (Send 41-56)
 
 **Planned**: First wave of a body-length A/B test announcing the new Belgium concert trailer (youtu.be/N75lvM0-hn8). Same subject ("Experience the energy of an evolved piano concert"), same hero (YouTube trailer thumbnail), same destination LP (belgium.musicalbasics.com/concert-trailer), same final CTA. Only the body varies: Short (~290 words, 7.6KB) vs Long (~720 words, 19.3KB with event details, bio, viral-videos bullets, 3 testimonials, 2x ticket CTAs). User wants to fire 4000 wave 1 (2000 per arm) and reserve the remaining 4931 for a later wave once the Short vs Long signal lands.
