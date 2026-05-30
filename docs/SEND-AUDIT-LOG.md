@@ -15,6 +15,72 @@ entry shows the audit happened.
 
 ---
 
+## 2026-05-30 early morning, Belgium concert trailer A/B wave 1: 16x250 SHORT vs LONG (Send 41-56)
+
+**Planned**: First wave of a body-length A/B test announcing the new Belgium concert trailer (youtu.be/N75lvM0-hn8). Same subject ("Experience the energy of an evolved piano concert"), same hero (YouTube trailer thumbnail), same destination LP (belgium.musicalbasics.com/concert-trailer), same final CTA. Only the body varies: Short (~290 words, 7.6KB) vs Long (~720 words, 19.3KB with event details, bio, viral-videos bullets, 3 testimonials, 2x ticket CTAs). User wants to fire 4000 wave 1 (2000 per arm) and reserve the remaining 4931 for a later wave once the Short vs Long signal lands.
+
+**A/B variable**: body length only. Subject, hero, click destinations, CTAs all identical.
+- Arm A (Short): `_work/belgium-trailer-short.html`
+- Arm B (Long): `_work/belgium-trailer-long.html` (adds Event Details, sold-out venues bio, livestream callout, viral-videos block linking to 3 new LPs `/moonlight-sonata-nightmare` `/12-levels-of-beethoven` `/still-dre`, 3 testimonials, 2nd LAST TICKETS CTA)
+
+**Audience**: 8931 unique canonical emails (after Wix BE/NL/LU/GB/DE add, xlsx unsub lists rejected as unreliable per `_work/analyze-xlsx-unsubs.py` analysis, only 14 of 5349 verifiably bad and already caught by Supabase status). Sub-sampled wave 1 = 4000 via SHA256(canonical(email)) deterministic split + hash-sort ASC selection of first 2000 per arm. Remainder (4931) carries forward for next wave; same hash function keeps re-runs disjoint via done-tag idempotency.
+
+**Children to audit (all 16, same subject + Variant B parent)**:
+- A1 short #1 `7cd42a91-4c8b-4e5c-8e2d-c4f3a51917e9` @ `2026-05-30T14:00:00Z`
+- B1 long  #1 `17d8714a-e6c6-4869-b522-a58b2b7d5774` @ `2026-05-30T14:04:00Z`
+- A2 short #2 `4d9f77ad-521a-41a1-9b8f-1c618fd22a97` @ `2026-05-30T14:08:00Z`
+- B2 long  #2 `92b3d149-5980-42a5-812a-1f9ebc186da5` @ `2026-05-30T14:12:00Z`
+- A3 short #3 `a6824a1f-16e5-41a1-9140-6b4aee94a04e` @ `2026-05-30T14:16:00Z`
+- B3 long  #3 `e006340a-c0f0-4a1e-b8f2-0f3886f2571d` @ `2026-05-30T14:20:00Z`
+- A4 short #4 `4feb9565-2266-420c-8bce-f22b85fa1b63` @ `2026-05-30T14:24:00Z`
+- B4 long  #4 `ceb2d6ba-a7c4-4903-8112-3c201bee0624` @ `2026-05-30T14:28:00Z`
+- A5 short #5 `81579094-01c7-42fc-ac42-2ceb5b75ce31` @ `2026-05-30T14:32:00Z`
+- B5 long  #5 `336aa777-5e5c-4c08-a93b-50e3053114ef` @ `2026-05-30T14:36:00Z`
+- A6 short #6 `9749bd98-5e65-42cc-9e77-a6f6a315087d` @ `2026-05-30T14:40:00Z`
+- B6 long  #6 `9c7da8d3-b7a6-4cc0-b739-dfe767507d19` @ `2026-05-30T14:44:00Z`
+- A7 short #7 `fb544e4f-07e2-4fd8-a2bf-9736b6c11003` @ `2026-05-30T14:48:00Z`
+- B7 long  #7 `083e9f68-b034-4d18-b794-7dc553e3b0cd` @ `2026-05-30T14:52:00Z`
+- A8 short #8 `4006d134-c4c6-4bfd-bed5-9ef6c9b794ae` @ `2026-05-30T14:56:00Z`
+- B8 long  #8 `f1543ca9-68ec-4580-bff0-3afc85787c9a` @ `2026-05-30T15:00:00Z`
+
+Pattern: 16 chunks of 250 recipients, interleaved A/B, 240s `scheduledAt` stagger. Real wall-clock under global send-lock will exceed the 1-hour scheduledAt spread; ~14 children x ~280s/child = ~70 min expected total fire window.
+
+**Audit at**: first audit `2026-05-30T05:59Z` (verdict UNSAFE, 3 blockers); re-audit at `2026-05-30T06:08Z` (verdict SAFE) after fixes; scheduler ran `06:07Z` (killed mid-flight at 14/16) and re-ran cleanly `07:35Z`. All children scheduled by `07:38Z`, ~6h22m before first fire.
+
+**Verdict**: `SAFE` (after fixes). First audit pass surfaced 3 blocking issues, all corrected:
+
+  1. **Test Account leak across non-Supabase sources**: `is_eligible_external` checked Test Account only on the Supabase pull; Shopify/Omnisend/Wix rows skipped that check. Lionel's own email `lionel@musicalbasics.com` was sitting at line 79758 of `trailer-audience.json` (Shopify consent:none geo:usa) and would have fired in Arm A. Fix: added `HARD_EXCLUDE` set at `_work/build-trailer-audience.py:70-79` applied at merge across all sources, populated from a live `tags ?? Test Account` Supabase query, caught 8 addresses: lionel@musicalbasics.com, musicalbasics@gmail.com, support@musicalbasics.com, yu_lionel@yahoo.com, yulionel829@gmail.com, djsputty@gmail.com, dark_mist3000@yahoo.com, crazycommunistkid@gmail.com. Grep confirms 0 occurrences of each in final audience JSON.
+
+  2. **Consent policy override bug**: `load_shopify()` was passing `status_hint="Subscribed"` to `is_eligible_external`, which flipped `is_subscribed=True` and bypassed the geo+consent gate. Net effect: 613 non-Belgium-geo consent:none Shopify customers (USA/CA/AU/etc.) were being silently admitted. Direct violation of CLAUDE.md "non-Belgium geo requires consent:marketing." Fix: removed the `status_hint="Subscribed"` override at `_work/build-trailer-audience.py:165` (now passes `""`). Audience dropped from 9471 -> 8931 after fix (Shopify-eligible: 4252 -> 3171; 537 net after dedup).
+
+  3. **Vercel timeout headroom**: per-child max 300 recipients * ~0.9s = ~270s vs 300s maxDuration = ~10% headroom. Recommended drop to 250 for ~25% headroom. Applied at `_work/schedule-belgium-trailer-ab.ts:39`.
+
+Re-audit verdict: `SAFE`. All sections PASS; D (DB UNIQUE constraint) carried as "verified in prior audits, not re-queried this session, app-level filter is primary guard"; non-blocking caveats noted: STAGGER_SEC=240 < per-child ~270s wall-clock so the stagger is execution-order hint only (not a meaningful interrupt window between children), and the 95% ensureSub success threshold could let up to 5% silently drop with no done-tag (coverage caveat, not retry safety).
+
+**Recovery mid-flight**: After the FIRST scheduler run successfully scheduled 14 of 16 children (8 short + 6 long, IDs 48cd08b2 through 9a30e128), the user spotted a phishing-risk pattern: the visible body text `https://youtu.be/N75lvM0-hn8` was hyperlinked to `belgium.musicalbasics.com/concert-trailer`. Display URL ≠ destination URL is a classic phishing-filter signature. Recovery actions all completed before any send fired:
+  - Killed scheduler PID 67355 (status 144)
+  - Set `scheduled_status='cancelled'` and `status='cancelled'` on all 14 children via `_work/cancel-trailer-wave1.ts`. Inngest `agent-scheduled-send.ts:69-74` short-circuits cancelled/completed campaigns so they would not have fired even if dispatch happened.
+  - Cleared `done-belgium-trailer-2026-05-30` tag from 3500 affected subs (had to run 4 passes due to PostgREST 1000-row cap; final count 0)
+  - Rewrote both email bodies to drop the visible URL text entirely: "The energy of the evening is captured in my concert trailer, watch it below." Thumbnail click and CTA button both still route to `/concert-trailer` for tracking.
+  - Re-sent self-tests, user approved, re-ran scheduler from clean state. 16 new children with IDs in this entry.
+
+Additional rounds of in-flight copy edits before re-firing: "select group" -> "lucky group", livestream callout rewrite ("get livestream tickets here" instead of "watch the VIP Livestream"), closing line rewrite ("the unforgettable energy of a Lionel Yu piano concert" instead of "the evolved version of the piano concert"), trailer LP autoplay round-trip (added muted autoplay, then reverted to click-to-play facade for unmuted-on-click UX). Subject/preheader unchanged from initial drafts.
+
+**Outcome**: TBD. First fire scheduled `14:00Z` (~10am EDT). Expected wall-clock 14:00Z -> ~15:10Z for all 16 to complete under global send-lock. Honest signals at 24-48h:
+
+- **Per-arm OPEN rate (Gmail-only honest)**: direct effect of Short vs Long. Hypothesis: Short opens slightly higher (preview snippet shorter and stronger CTA-forward) but Long opens hold or beat if the trailer thumbnail + "lucky group" framing primes click intent.
+- **Per-arm CTR to /concert-trailer**: the key A/B signal. Short relies on thumbnail + 1 button. Long adds: viral-videos bullet links to 3 separate LPs (additional click targets, may inflate raw click count). To compare arms cleanly, compare clicks to `/concert-trailer` specifically, not total link clicks.
+- **Per-arm UNSUB rate**: Long has 2x ticket CTAs + 3 testimonials + bio paragraph -> stronger ask -> may push unsubs slightly higher. Watch.
+- **Spam-flag risk**: visible URL mismatch was the primary risk; eliminated. Hero thumbnail still uses `img.youtube.com/vi/...` CDN URL but that's an `<img>` src, not visible link text, no phishing flag.
+- **Trailer LP conversion signal**: `/concert-trailer` LP has in-person + livestream ticket CTAs both pointing to belgium.musicalbasics.com/, track UTM/click data on that bounce.
+- **Anti-signal to watch**: if non-Belgium-geo Long opens drop significantly more than Belgium-geo Long opens, the 720-word "concert details" body is too venue-specific for the global audience (since 60%+ of the 4000 cannot attend in-person and only the livestream pitch applies). Would inform Wave 2 copy split.
+
+Wave 2 holds 4931 net-new recipients with done-tag idempotency. Same script, no code changes needed, just re-run after wave 1 signal is in hand.
+
+Master log entry: 4000 rows tagged `done-belgium-trailer-2026-05-30` post-fire.
+
+---
+
 ## 2026-05-27 early morning, Campaign 2 wave 13: 4x250 FUR ELISE PREHEADER A/B retargeting (Send 37-40)
 
 **Planned**: Pivot of the Fur Elise retargeting test variable. W11+W12 (750/750) showed the subject test directionality is locked: "boring" wins CTR by 1.5x, "2026" wins opens by +1.2pp, unsubs nearly tied. Continuing the subject A/B is low-learning. Pivoting to test PREHEADER text (untested variable in C2). Locked subject = winner on CTR: "They said 'Fur Elise' is boring, so I played this".
