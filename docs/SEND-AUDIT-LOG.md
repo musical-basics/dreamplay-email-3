@@ -15,6 +15,65 @@ entry shows the audit happened.
 
 ---
 
+## 2026-05-31 early morning, Belgium trailer A/B wave 3: 13x250 SHORT vs C head-to-head (Send 65-77)
+
+**Planned**: Wave 3 of the trailer campaign. Pivots the A/B variable from body-length (Short vs Long, waves 1+2) to subject+intro framing: Short (control, "Experience the energy of an evolved piano concert") vs Version C ("Watch my upcoming concert trailer"). Same length, same hero, same LP destination, same CTAs and closing. Only the subject + opening lines change. Hypothesis: action-clarity subject sets clearer expectation and lifts click-through-per-open.
+
+**A/B variable**: subject + opening copy. Body length and CTA unchanged.
+- Arm A (Short, control): `_work/belgium-trailer-short.html` with subject "Experience the energy of an evolved piano concert"
+- Arm B (Version C): `_work/belgium-trailer-c.html` with subject "Watch my upcoming concert trailer"
+
+**Audience**: 2,883 unique canonical (after cross-workspace non-active exclusion fix). Discovered on 2026-05-30 evening that the prior audience build only checked status on `musicalbasics` workspace; 151 of the wave-1+2 recipients were non-active on `dreamplay_marketing` and hurt sender reputation. Fixed at `_work/build-trailer-audience.py:326-372` to scan all workspaces. Audience dropped from 8931 to 2883.
+
+**Bucket re-purposing**: re-use the existing SHA256-hash split. People who hash to "short" get Short; people who hash to "long" bucket get Version C (long-bucket was untouched on positions 3000+ since waves 1+2 only consumed positions 0..2999). Hash is uniform so the two pools are demographically equivalent random samples.
+
+**Children to audit (13 total)**:
+
+Originally planned 12 children at 09:00-09:44 UTC, but scheduler crashed mid-flight on chunk 10's bulk-tag step due to invalid email `ryahn.vehra#@gmail.com` in audience. Chunks 1-10 already scheduled at that point. Recovery added chunks 11+12 then a chunk 13 for c-arm stragglers (the rebuilt audience had a different hash distribution than the original 8931, so the c-arm pool was larger than the original 1440 cap).
+
+- A1 short #1 `c72959b1-722c-432e-bfe8-eadced4464ec` @ `2026-05-31T09:00:00Z` (250)
+- B1 c #1     `e6bcce9c-d7b2-4700-85d0-4b2405715b4f` @ `2026-05-31T09:04:00Z` (250)
+- A2 short #2 `092debde-8e74-4be7-82a9-39a5ba148d3c` @ `2026-05-31T09:08:00Z` (250)
+- B2 c #2     `2821d281-ff09-45c9-af80-9b4503627971` @ `2026-05-31T09:12:00Z` (250)
+- A3 short #3 `c2267747-1091-455e-8a61-5874fa3949da` @ `2026-05-31T09:16:00Z` (250)
+- B3 c #3     `2fc3b033-67d0-4c4d-a0c7-61617382baca` @ `2026-05-31T09:20:00Z` (250)
+- A4 short #4 `b698b20d-881f-4a1b-8bf9-513fabc511eb` @ `2026-05-31T09:24:00Z` (250)
+- B4 c #4     `d3eadd16-2108-4048-a072-a2deb3896ef3` @ `2026-05-31T09:28:00Z` (250)
+- A5 short #5 `0ac900a0-9f0a-4b77-b7f8-5448ba035099` @ `2026-05-31T09:32:00Z` (250)
+- B5 c #5     `68e3d028-23fa-4871-9d73-819d9a142d15` @ `2026-05-31T09:36:00Z` (249, dropped 1 invalid)
+- A6 short #6 `7687efd1-dd56-4ee0-9163-cb7a7c35bf4c` @ `2026-05-31T09:40:00Z` (176)
+- B6 c #6     `671b3909-d5d7-419f-a627-1a5dc21129ef` @ `2026-05-31T09:44:00Z` (250)
+- B7 c #7 stragglers `7b294b12-adaa-4e4a-95ca-0cc03ec97ef9` @ `2026-05-31T09:48:00Z` (224)
+
+Totals: Short 1426 recipients, C 1973 recipients. C arm is larger than Short due to hash distribution of the rebuilt audience, not by design. A/B comparison still valid (rates compared, not absolute counts).
+
+**Audit at**: `2026-05-30T19:00Z`, ~14h before first fire. Re-audited after script changes (per-arm subject patching, cross-workspace exclusion).
+
+**Verdict**: `SAFE` (all sections PASS, per-arm subject patching verified, cross-workspace exclusion verified). Same carried caveats as waves 1+2: D (DB UNIQUE constraint not re-queried, app-level filter is primary guard) and STAGGER_SEC=240 vs per-child ~225s.
+
+**Mid-flight issue + recovery (not in pre-audit)**: Scheduler crashed at chunk 10's bulk-tag because of an invalid email (`#` in local part). Chunks 1-10 already scheduled successfully (the bad email had failed ensureSub silently so was excluded from chunk 10's send; only the bulk-tag step bombed). Recovery via `_work/resume-w3-chunks-11-12.ts` + `_work/resume-w3-stragglers.ts`:
+
+1. Pre-filter invalid emails in recovery script (regex check before ensureSub and bulk-tag)
+2. Manually backfilled chunk 10's bulk-tag (idempotent for already-tagged)
+3. Scheduled chunks 11, 12, 13 at 09:40, 09:44, 09:48 UTC
+4. All recipients done-tagged
+
+For future runs: should add the email regex pre-filter to the main scheduler too. Noted as a deferred fix.
+
+**Outcome**: TBD. Honest signals to watch at 24-48h:
+
+- **Per-arm OPEN rate (Gmail-only honest)**: hypothesis is C slightly LOWER opens (less curiosity-bait subject) but acceptable trade-off.
+- **Per-arm CTR (the key A/B variable here)**: hypothesis is C HIGHER clicks-per-open because subject sets clearer expectation ("you'll click and watch a trailer").
+- **Per-arm CTR to `/concert-trailer` specifically**: direct measure of "did they actually watch the trailer."
+- **Per-arm UNSUB rate**: should be near identical (body content overlap is high).
+- **No regressions expected**: cross-workspace fix should reduce silent bounces.
+
+Wave 3 is the last wave; the remaining audience is exhausted after this. All 8931 - 5976 - 2856 = ~99 (rounding) folks in the original audience are now hit.
+
+Master log entry: ~3000 more rows tagged `done-belgium-trailer-2026-05-30` post-fire. Final total after wave 3: ~8976 unique recipients across the 3-wave trailer campaign.
+
+---
+
 ## 2026-05-30 midday, Belgium concert trailer A/B wave 2: 8x250 SHORT vs LONG (Send 57-64)
 
 **Planned**: Second wave of the same body-length A/B test. Wave 1 (4000) fired cleanly at 14:00Z and gave directional Short-wins-opens signal (+4.2pp aggregate, Short wins all 8 paired chunk-vs-chunk comparisons). User wants to widen the sample with another 1k/1k for more confidence before deciding on wave 3. Same subject, same hero, same LP, same email bodies as wave 1, no code changes other than `SUBSAMPLE_PER_ARM` 2000 to 1000 and `SCHEDULED_FIRST_FIRE` 14:00Z to 16:30Z.
