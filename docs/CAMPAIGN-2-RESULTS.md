@@ -146,3 +146,7 @@ Apples-to-apples unsub rate by content style. Important because Rach has fewer t
 - Does the Rach variant's lower unsub rate hold when sample size grows to ~1,500+? W9+W10 will help firm this up.
 - Is the W7 finding (Rach wins clicks AND unsubs, NST wins opens) durable, or is it a function of the audience having already seen 6 NST waves and being open-fatigued on that framing?
 - Conversion to Belgium concert ticket sales: not yet tracked at the click-to-purchase level in C2 (Belgium landing page Shopify analytics would need cross-correlation with `subscriber_events` clicks). Worth instrumenting before drawing dollar-value conclusions.
+
+## Follow-up campaign
+
+Campaign 3 (Belgium concert trailer A/B, 9,143 recipients across 3 waves, 2026-05-30 to 2026-05-31) results: [CAMPAIGN-3-TRAILER-RESULTS.md](CAMPAIGN-3-TRAILER-RESULTS.md). Key finding that closes a C2 open question: action-clarity subject framing ("Watch my upcoming concert trailer") lifts trailer-LP CTR by +54% relative vs benefit-framing ("Experience the energy..."), at equal open rate. Short body beats Long body on every engagement metric.
