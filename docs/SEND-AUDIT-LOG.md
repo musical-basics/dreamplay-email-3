@@ -15,6 +15,75 @@ entry shows the audit happened.
 
 ---
 
+## 2026-06-03 morning, Belgium livestream O/P/Q 3-way variant test for non-local audience: 9 children, ~667/arm (Send 87-95)
+
+**Planned**: Companion to this morning's L/M/N (local Belgium-region) send. O/P/Q targets the NON-local audience with a $5 livestream-first pitch instead of the in-person logistics pitch. Three email variants each pairing with a matching landing-page variant on `belgium.musicalbasics.com`.
+
+**A/B/C variable**: full email + full LP per arm (same intentionally-messy multi-factor design as the L/M/N test).
+- O: `_work/variant-o-final.html`, subject "Watch my upcoming concert livestream" → `https://belgium.musicalbasics.com/o` (Gemini international page)
+- P: `_work/variant-p-final.html`, subject "Watch my Belgium concert livestream" → `https://belgium.musicalbasics.com/p` (ChatGPT international page)
+- Q: `_work/variant-q-final.html`, subject "Watch my Belgium concert live, June 11." → `https://belgium.musicalbasics.com/q` (Claude international page)
+
+**Cross-link experiment**: each email's secondary "in-person tickets" link points to the OPPOSITE-numbered local LP (O→/l, P→/m, Q→/n). The main livestream CTA stays on the matching international LP (O→/o, P→/p, Q→/q). UTM `utm_content=variant-{o,p,q}-inperson-to-{l,m,n}` so LP-side analytics can attribute clicks back to which email arm sent them.
+
+**Audience**: 2,000 non-local recipients from `_work/build-nonlocal-audience.py`. Filtering:
+- musicalbasics workspace, status=active
+- NOT in BE/NL/LU/GB/DE (country_code or geo:* tag)
+- NOT carrying `done-belgium-logistics-2026-06-02` (the L/M/N audience from earlier today)
+- NOT consent:revoked, NOT non-active on any cross-workspace, NOT HARD_EXCLUDE
+- Subsampled by SHA256 hash from 6,374 eligible non-local subs down to 2,000
+
+Country mix: US 1,023 (51%), no-country 617 (31%), AU 87, CA 81, FR 34, rest long-tail.
+
+**Split**: deficit-fill round-robin on hash-sorted email. No BENELUX special-case needed (audience excludes BENELUX). Per-arm totals locked to within +-1.
+
+- O: 667 (US 337, no-country 201, AU 34, CA 27, FR 9)
+- P: 667 (US 356, no-country 191, AU 36, CA 28, FR 10)
+- Q: 666 (US 330, no-country 225, CA 26, AU 17, FR 15)
+
+**Children scheduled (9 total, interleaved O→P→Q, 240s stagger)**:
+
+- O1 #1 `11723cd7-d218-4071-bf45-12b8a9365539` @ `2026-06-03T11:00:00Z` (250)
+- P1 #1 `d4ba2213-a2af-4361-983b-c669a7a2e965` @ `2026-06-03T11:04:00Z` (250)
+- Q1 #1 `40a447d7-ff63-4078-9e80-d3597e436c54` @ `2026-06-03T11:08:00Z` (250)
+- O2 #2 `88b34a2d-0622-4302-b644-770ff02c2c93` @ `2026-06-03T11:12:00Z` (250)
+- P2 #2 `b8f79886-83a4-4ade-afda-955bdd115af2` @ `2026-06-03T11:16:00Z` (250)
+- Q2 #2 `20ac521f-af8d-4fbf-bf79-a08f707aa986` @ `2026-06-03T11:20:00Z` (250)
+- O3 #3 `f96d88cf-c1db-439f-b8dc-69548ec4041d` @ `2026-06-03T11:24:00Z` (167)
+- P3 #3 `b45f871b-fec2-40f7-ba86-8658fb0d2dc4` @ `2026-06-03T11:28:00Z` (167)
+- Q3 #3 `bdf67ba9-8e0d-4388-8948-9080c5f32ce0` @ `2026-06-03T11:32:00Z` (166)
+
+Totals: O 667, P 667, Q 666 = 2000. First fires 7:00am EDT, last fires 7:32am EDT, last completes ~7:36am EDT.
+
+**Audit at**: `2026-06-03T06:57Z`, ~4h before first fire. Auditor: `send-safety-auditor` subagent.
+
+**This was the FIRST production fire of the new send-wave SDK** (`src/lib/send-wave/`, shipped earlier in commit `6ba38fc`). The scheduler script (`_work/schedule-belgium-livestream-opq.ts`) is **30 lines** vs the ~280-line hand-written L/M/N scheduler from yesterday. 88% reduction. All the safety guards (em-dash, scheduledAt freshness, invalid-email regex, done-tag idempotency, ensure-pool >= 95% threshold, chunk/interleave/stagger, em-dash recheck after patch, shipping_city instead of city, append click-tracking) are enforced centrally by `runWaveSend()`.
+
+**Verdict**: `SAFE`. All blocking sections pass. Auditor specifically called out SDK-enforced guards as PASS: shipping_city (Zod fix), em-dash + placeholder guards run per arm before any DB write, clickTrackingMode default "append", round-trip verify of subject + subscriber_ids + html em-dash after patch, 95% ensureSub abort threshold, email-Supabase-project guard. Same carried caveats as prior sends: D (DB UNIQUE on sent_history not re-queried) and the STAGGER_SEC=240 vs per-child ~225s observation.
+
+**Caught + fixed during prep**:
+1. Variant O originally claimed a "Pro multi-camera stream" / "high-definition, multi-camera livestream". We don't have a multi-cam setup. Replaced with "Live HD broadcast" / "high-definition livestream" before fire.
+2. Variant Q originally said "Nightmare series performed live with a string section". We have a violinist and cellist, not a full string section. Replaced with "with violin and cello" before fire.
+3. Same string-section line went out in variant N earlier today (06:00-06:35 UTC) to 691 recipients before we caught it. Already in inboxes; unrecallable.
+4. Variant P's "Official in-person tickets" link originally went to the external CC De Factorij ticketing page. Rerouted to `/m` per the cross-link experiment design.
+5. Subject for O was originally "Watch my upcoming concert trailer" (same string as 2026-05-31 wave-3 C subject, would have been a near-dupe for some recipients). Switched to "Watch my upcoming concert livestream" so the subject sets a livestream expectation matching the body.
+
+**Deferred (acknowledged but not addressed this run)**:
+1. Variant Q has no hero image and therefore no `utm_content=variant-q-hero`. Auditor flagged for cross-arm UTM consistency. Non-blocking, intentional design difference.
+2. New per-session memory written: `feedback_fact_check_marketing_claims.md` (fact-check inherited production claims like "multi-cam" / "string section" before sending).
+
+**Outcome**: TBD. Honest signals to watch at 24-48h:
+
+- **Per-arm OPEN rate (Gmail-only honest)**: hypothesis is roughly equal opens. Subject framing is all action-oriented.
+- **Per-arm livestream-LP click rate**: this is the main test — same body length / similar pitch, three different LP designs. The arm whose LP converts visitors to $5 livestream tickets wins.
+- **Cross-link in-person click rate**: tracks how many non-local recipients consider flying / training to the actual concert. Hypothesis: very small (<1%) since this audience self-selected as non-local.
+- **Per-arm $5 livestream purchases**: the conversion signal.
+- **SDK validation**: did `runWaveSend()` perform identically to the hand-written L/M/N scheduler from yesterday morning? Compare per-child timing + per-recipient send-rate.
+
+Master log entry: ~2000 subs tagged `done-belgium-livestream-2026-06-03` post-fire. Plus each gets a `belgium-livestream-opq-2026-06-03:{o|p|q}` arm tag for downstream analytics.
+
+---
+
 ## 2026-06-03 early morning, Belgium logistics L/M/N 3-way variant test: 9 children, 693/arm (Send 78-86)
 
 **Planned**: First post-trailer Belgium-region followup. Three parallel arms (L, M, N), each pairing an email variant with a matching landing-page variant on `belgium.musicalbasics.com`. Goal: pinpoint which combination of email-framing and LP layout converts BENELUX/UK/DE recipients best for the June 11 concert.
