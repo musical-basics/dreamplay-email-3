@@ -15,6 +15,65 @@ entry shows the audit happened.
 
 ---
 
+## 2026-06-03 early morning, Belgium logistics L/M/N 3-way variant test: 9 children, 693/arm (Send 78-86)
+
+**Planned**: First post-trailer Belgium-region followup. Three parallel arms (L, M, N), each pairing an email variant with a matching landing-page variant on `belgium.musicalbasics.com`. Goal: pinpoint which combination of email-framing and LP layout converts BENELUX/UK/DE recipients best for the June 11 concert.
+
+**A/B/C variable**: full email + full LP per arm (NOT a controlled-variable test, this is intentionally messy).
+- L: `_work/variant-l-final.html`, subject "Brussels in 9 days. Only ~60 tickets left." → `https://belgium.musicalbasics.com/l` (Gemini Deepthink local logistics page)
+- M: `_work/variant-m-final.html`, subject "You're close enough to be there. Belgium, June 11." → `https://belgium.musicalbasics.com/m` (ChatGPT page)
+- N: `_work/variant-n-final.html`, subject "For one night, I'm playing live in Zaventem." → `https://belgium.musicalbasics.com/n` (Claude page)
+
+All 3 emails carry `utm_source=musicalbasics&utm_medium=email&utm_campaign=belgium-2026-06-11&utm_content=variant-{l,m,n}-{logo,hero,cta,official}` so LP-side analytics can attribute back to arm.
+
+**Audience**: 2,079 unique canonical from `_work/build-logistics-audience.py` (Belgium-region geos: BE/NL/LU/UK/DE + N-France). Up 5.8% from the previous run's 1,964 thanks to the 2026-06-02 location enrichment backfill (280 subs got `country_code` + `geo:*` tags from concert LP analytics IP-geo + click-event IP geocode + email-domain heuristic).
+
+**Split**: 693 per arm exactly. BENELUX (BE/NL/LU, 262 total) round-robin balanced per-country across arms; non-BENELUX (DE/GB/FR, 1,817) deficit-filled to lock totals at 693/693/693. Split is deterministic (sorted SHA256 + per-country round-robin for BENELUX, hash-sorted + min-arm assignment for the rest). Script: `_work/split-lmn-audience.py`.
+
+- L: 693 (88 BENELUX: 25 BE / 58 NL / 5 LU; 370 DE; 204 GB; 31 FR)
+- M: 693 (88 BENELUX: 25 BE / 58 NL / 5 LU; 356 DE; 217 GB; 32 FR)
+- N: 693 (86 BENELUX: 24 BE / 58 NL / 4 LU; 354 DE; 226 GB; 27 FR)
+
+**Children scheduled (9 total, interleaved L→M→N, 240s stagger)**:
+
+- L1 #1 `57581d19-64b7-4274-aea0-89d424ef2ad5` @ `2026-06-03T06:00:00Z` (250)
+- M1 #1 `a3933dd6-224b-4c74-be1b-db6a86ff37ab` @ `2026-06-03T06:04:00Z` (250)
+- N1 #1 `b7439d43-8a81-40b5-9a7a-9cc434d215d3` @ `2026-06-03T06:08:00Z` (250)
+- L2 #2 `3488c34a-3f4a-434a-b948-7af82a4e6515` @ `2026-06-03T06:12:00Z` (250)
+- M2 #2 `2d563ef4-6fca-4ec8-9a49-759d572ae1be` @ `2026-06-03T06:16:00Z` (250)
+- N2 #2 `edae9ad0-37e0-46e0-8e04-7a7f4bbaf5ca` @ `2026-06-03T06:20:00Z` (250)
+- L3 #3 `36ebb208-341b-434a-a34d-1bf854806281` @ `2026-06-03T06:24:00Z` (193)
+- M3 #3 `1c4f6309-7dac-4678-8d56-fe4d32f1e45a` @ `2026-06-03T06:28:00Z` (193)
+- N3 #3 `444a80ff-a206-4582-a635-720394dcd956` @ `2026-06-03T06:32:00Z` (193)
+
+Totals: L 693, M 693, N 693 = 2079. First fires 2:00am EDT, last fires 2:32am EDT, last completes ~2:36am EDT.
+
+**Audit at**: `2026-06-03T03:41Z`, ~2h19min before first fire. Auditor used: `send-safety-auditor` subagent.
+
+**Verdict**: `SAFE`. All blocking sections (A idempotency, B throttle, C concurrency lock, E audience filter, E2 scheduledAt fresh, G state guards) PASS. Carried caveats: D (DB UNIQUE on sent_history not live-queried, app-level filter is primary guard) and the same STAGGER_SEC=240 vs per-child ~225s observation as prior waves.
+
+**Caught + fixed during prep**:
+1. Variant M had 2 em dashes in original HTML (subject + footer line). Stripped to commas. Variant M also had `LANDING_PAGE_URL` placeholder unresolved and no actual unsubscribe link, both fixed before test send.
+2. Variant L used Omnisend-style `{{ subscriber.first_name | default: 'Lionel' }}` merge tag (wouldn't resolve in this system). Normalized to `{{first_name}}`.
+3. Variant N hero link was the bare `belgium.musicalbasics.com/?utm` (would route to control variant A). Pinned to `/n?utm`.
+4. Logistics audience builder previously only checked status on `musicalbasics` workspace. Already fixed in prior session (2026-05-30) to scan all workspaces, that fix is the reason this run dropped 834 cross-workspace non-actives before scheduling.
+
+**Deferred (acknowledged but not addressed this run)**:
+1. Scheduler still sends `body.city` to `/api/agent/{ws}/subscribers` but the Zod schema expects `shipping_city`. Zod strips unknown keys silently so no 400, but the city won't persist on the subscriber row. Cosmetic data-fidelity issue, not a send-safety issue. Suggest `body.shipping_city = c.city` next iteration.
+2. The invalid-email regex pre-filter from `_work/resume-w3-chunks-11-12.ts` has now been backported into this scheduler (`_work/schedule-belgium-logistics-lmn.ts:91, 145-153`). Should propagate the same fix into any future main-line scheduler.
+
+**Outcome**: TBD. Honest signals to watch at 24-48h:
+
+- **Per-arm OPEN rate (Gmail-only honest)**: hypothesis is roughly equal opens (subjects all action-oriented).
+- **Per-arm CTR**: this is where the email-framing layer is tested.
+- **Per-arm `/l` vs `/m` vs `/n` LP sessions** (UTM-attributed): pure email→LP funnel.
+- **Per-arm in-person ticket purchases**: the headline metric, since this entire send exists because the trailer drove livestream-only purchases (0 in-person from trailer waves).
+- **BENELUX subset specifically**: 88/88/86 per arm. If any arm wins on the BENELUX slice, that's the highest-confidence comparison (balanced per-country across arms).
+
+Master log entry: ~2079 subs tagged `done-belgium-logistics-2026-06-02` post-fire. Plus each gets a `belgium-logistics-lmn-2026-06-03:{l|m|n}` arm tag so later analytics can identify who saw which.
+
+---
+
 ## 2026-05-31 early morning, Belgium trailer A/B wave 3: 13x250 SHORT vs C head-to-head (Send 65-77)
 
 **Planned**: Wave 3 of the trailer campaign. Pivots the A/B variable from body-length (Short vs Long, waves 1+2) to subject+intro framing: Short (control, "Experience the energy of an evolved piano concert") vs Version C ("Watch my upcoming concert trailer"). Same length, same hero, same LP destination, same CTAs and closing. Only the subject + opening lines change. Hypothesis: action-clarity subject sets clearer expectation and lifts click-through-per-open.
