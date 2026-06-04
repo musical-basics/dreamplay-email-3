@@ -15,6 +15,72 @@ entry shows the audit happened.
 
 ---
 
+## 2026-06-04 early morning, Belgium livestream O/P/Q REMAINDER send to the rest of non-local: 18 children, ~1457/arm (Send 96-113)
+
+**Planned**: 2026-06-03's first OPQ fire subsampled the non-local eligible pool from 6,374 down to 2,000. Today fires the remaining 4,370 across the same three arms. Same email + LP pairings (O→/o, P→/p, Q→/q). Goal: increase sample on O/P/Q to ~1,500/arm so the conversion comparison has more signal than the ~667/arm first fire (which produced 1 begin_checkout total).
+
+**A/B/C variable**: identical to 2026-06-03 OPQ. Same emails, same LPs, same cross-link experiment (in-person CTA on email → opposite-numbered local LP: O→/l, P→/m, Q→/n).
+
+**Audience**: 4,370 unique canonical from `_work/build-nonlocal-audience.py` after bumping `TARGET_SIZE` from 2000 to effectively-no-cap. Filtering excludes `done-belgium-livestream-2026-06-03` so yesterday's 2,000 are gone from the pool. After canonical-dedup in the splitter (added today after auditor caught 2 Gmail dot-trick / +tag collisions across P and Q), final = 4,370.
+
+**Split** (deficit-fill round-robin on hash-sorted canonical email, then disjoint by canonical):
+- O: 1,457
+- P: 1,457
+- Q: 1,456
+
+**Children scheduled (18 total, interleaved O→P→Q, 240s stagger)**:
+
+Original scheduler run via `_work/schedule-belgium-livestream-opq.ts` got through wave 11 then crashed on the `bulk-tag` step with a 500 from the agent API. Recovery via `_work/resume-opq-remainder-chunks-12-18.ts` backfilled wave 11's done-tag and scheduled waves 12-18. All 18 children scheduled cleanly across 2 invocations.
+
+| # | Arm | Chunk | Recips | UTC | Child ID |
+|---|---|---:|---:|---|---|
+| 1 | O | 1 | 250 | 08:00 | `31f406e9…` |
+| 2 | P | 1 | 250 | 08:04 | `2ab8a458…` |
+| 3 | Q | 1 | 250 | 08:08 | `b542ebe1…` |
+| 4 | O | 2 | 250 | 08:12 | `fbcdb376…` |
+| 5 | P | 2 | 250 | 08:16 | `2ef740fd…` |
+| 6 | Q | 2 | 250 | 08:20 | `aeb41d1c…` |
+| 7 | O | 3 | 250 | 08:24 | `a87d8483…` |
+| 8 | P | 3 | 250 | 08:28 | `04430a27…` |
+| 9 | Q | 3 | 250 | 08:32 | `31c78e23…` |
+| 10 | O | 4 | 250 | 08:36 | `09c73eb7…` |
+| 11 | P | 4 | 250 | 08:40 | `02784a4b…` *bulk-tag failed, backfilled in recovery* |
+| 12 | Q | 4 | 250 | 08:44 | `3f16407e…` *resume* |
+| 13 | O | 5 | 250 | 08:48 | `88f45902…` *resume* |
+| 14 | P | 5 | 250 | 08:52 | `a8f8483c…` *resume* |
+| 15 | Q | 5 | 250 | 08:56 | `4c3aae50…` *resume* |
+| 16 | O | 6 | 207 | 09:00 | `6b8adcc8…` *resume* |
+| 17 | P | 6 | 207 | 09:04 | `3671182e…` *resume* |
+| 18 | Q | 6 | 206 | 09:08 | `1c9efec0…` *resume* |
+
+Totals: O 1,457, P 1,457, Q 1,456 = 4,370. First fires 4:00am EDT, last fires 5:08am EDT.
+
+**Audit at**: `2026-06-04T05:05Z`, ~3h before first fire. Auditor: `send-safety-auditor` subagent.
+
+**Verdict**: initial `NEEDS_REVIEW` (auditor caught 2 Gmail-canonical overlaps between P and Q: `hydra1991fan+598@gmail.com` vs `hydra1991fan+267@gmail.com` and `peter.l.bogardus@gmail.com` vs `peterlbogardus@gmail.com`). Fixed by adding a canonical-dedup pass to `_work/split-opq-audience.py` (drops dupes by `canon(email)` before splitting). Post-fix re-verified 0 overlap across O/P/Q. All other audit sections PASS: idempotency / throttle / done-tag filter / scheduledAt freshness / clickTrackingMode append / shipping_city / chunk-size headroom.
+
+**Caught + fixed during prep**:
+1. Auditor caught 2 Gmail canonical-email cross-arm duplicates → fixed in splitter.
+
+**Mid-flight issue + recovery (not in pre-audit)**:
+1. Agent API returned 500 on `/api/agent/musicalbasics/subscribers/bulk-tag` immediately after scheduling wave 11 (P chunk 4). Same kind of mid-flight failure that hit W3 trailer on 2026-05-31. Recovery via dedicated resume script: (a) backfill done-tag for P chunk 4's 250 recipients, (b) call `scheduleWave` directly for waves 12-18 at their original 240s-stagger times. No double-send risk because waves 1-11 were tagged before resume ran.
+2. Also: 1 ensureSub 500 for `tinethierauch@outlook.com` (got 4,369/4,370 = 99.98% — passed the 95% threshold so scheduler continued). That recipient will not be scheduled into any child.
+
+**Deferred (acknowledged but not addressed this run)**:
+1. The agent API `/subscribers` and `/bulk-tag` endpoints are returning intermittent 500s under load. Suggest adding retry-on-5xx logic to the SDK's `api()` helper in `src/lib/send-wave/api-client.ts`. Today's recovery worked because the retried bulk-tag succeeded; could fail next time.
+2. Yesterday's 2,000 sample produced 0 confirmed purchases (1 begin_checkout from cebussmann/livestream that didn't complete). Sending 4,370 more without first diagnosing the funnel is a known judgment call — user accepted on the grounds that more sample lets us tell whether the comparison is meaningful at all.
+
+**Outcome**: TBD. Honest signals to watch at 24-48h, now with 3x the sample:
+
+- **Per-arm Gmail open rate** — first round was tied at ~35-36% across O/P/Q. Subject framing is essentially equivalent.
+- **Per-arm LP sessions from email source** (utm_source=musicalbasics) — first round had O=4, P=6, Q=8. Q was best on LP traffic; O was best on intent. With 3x sample we'll see which of those signals holds.
+- **Per-arm begin_checkout** — only meaningful metric. First round: O=1, P=0, Q=0.
+- **Per-arm confirmed Shopify purchases** — the actual conversion. First round: 0. If this round also produces 0, the funnel needs investigation before any further OPQ send.
+
+Master log entry: ~4,370 subs newly tagged `done-belgium-livestream-2026-06-03` post-fire. Total now tagged: ~6,370 (yesterday's 2k + today's 4.37k). Each gets a `belgium-livestream-opq-2026-06-03:{o|p|q}` arm tag for downstream analytics.
+
+---
+
 ## 2026-06-03 morning, Belgium livestream O/P/Q 3-way variant test for non-local audience: 9 children, ~667/arm (Send 87-95)
 
 **Planned**: Companion to this morning's L/M/N (local Belgium-region) send. O/P/Q targets the NON-local audience with a $5 livestream-first pitch instead of the in-person logistics pitch. Three email variants each pairing with a matching landing-page variant on `belgium.musicalbasics.com`.
