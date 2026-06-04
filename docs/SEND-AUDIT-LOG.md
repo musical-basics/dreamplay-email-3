@@ -15,6 +15,73 @@ entry shows the audit happened.
 
 ---
 
+## 2026-06-04 morning, Belgium checkout-recovery to 6 European abandoners: 6 children (Send 114-119)
+
+**Planned**: Personal customer-support-tone follow-up to 6 European buyers who started Shopify checkout for the June 11 Belgium concert but didn't complete. Crossed-referenced two data sources:
+1. LP-side `concert_analytics.analytics_logs` begin_checkout events with email captured (4 real humans since 2026-06-01 when the event-firing was instrumented).
+2. Shopify abandoned-checkouts export (`_work/checkouts_export.csv`, 15 Belgium concert items across 14 unique buyers).
+
+**Filtering** (applied in this order):
+- Belgium concert lineitems only: `General Ticket: Zaventem...`, `Belgium Concert VIP Ticket...`, `Belgium Concert Livestream...`
+- Drop Lionel test accounts (`yulionel829@gmail.com`)
+- Drop Shop Pay synthetic emails (`shop_pay@silent.promo`)
+- Drop confirmed conversions (`rebelo.rodrigues@gmail.com` who bought 2 tickets)
+- Drop non-European buyers (US/CA/AU buyers — keep them as warm but not flight-realistic for this campaign)
+- Drop unknown-country buyers with no DB / no analytics presence (`deborah.shore@gmail.com`, `rowenriel@gmail.com`)
+- Result: 6 European abandoners
+
+**Roster** (final):
+
+| # | Email | First | Geo | Arm | Ticket | Sessions | Template |
+|---|---|---|---|---|---|---:|---|
+| 1 | beerendlauwers@gmail.com | Beerend | BE | M | standard | 3 | multi |
+| 2 | vdebaille@yahoo.fr | (none) | BE | L | standard | 1 | single |
+| 3 | yonic.surny@gmail.com | Yonic | BE | (NOT on our list) | standard | 1 | single |
+| 4 | marinhofalcaorita@gmail.com | Rita | PT | O | standard | 1 | single |
+| 5 | thierry.sartorius@wanadoo.fr | Thierry | FR | M | **VIP** | 1 | single |
+| 6 | paul@antigeek.net | Paul | GB | L | standard | 1 | single |
+
+Names pulled from Shopify billing where not in our DB. yonic.surny is the only abandoner not on our email list; `ensureSub` upserted them via the agent API before the send.
+
+**Tone + content** (per user direction): customer-support tone, not marketing. Opens with "Looks like your Belgium concert ticket checkout didn't complete. Sorry if the page gave you trouble." Two paths back, both on our properties: (a) direct Shopify cart URL for their ticket variant with `?country=XX` pre-fill from the LP `dp_country` cookie patch (deployed 2026-06-04 commit `0eb07e8`), (b) the LP arm they originally landed on. No CC De Factorij external link. No marketing branding / logo / footer; signed simply "Lionel". Beerend gets a slightly different template acknowledging multiple checkout attempts (3 sessions in 14h).
+
+**Children scheduled (6 total, staggered 60s each)**:
+
+| # | Variant | Recip | Fires UTC | Fires EDT | Child ID |
+|---|---|---|---|---|---|
+| 1 | Beerend multi | beerendlauwers@gmail.com | 12:00 | 8:00 am | `5b8cc639…` |
+| 2 | there single | vdebaille@yahoo.fr | 12:01 | 8:01 am | `0bf5bc61…` |
+| 3 | Yonic single | yonic.surny@gmail.com | 12:02 | 8:02 am | `0bc656ad…` |
+| 4 | Rita single | marinhofalcaorita@gmail.com | 12:03 | 8:03 am | `efb66bb6…` |
+| 5 | Thierry single (VIP) | thierry.sartorius@wanadoo.fr | 12:04 | 8:04 am | `f18095d9…` |
+| 6 | Paul single | paul@antigeek.net | 12:05 | 8:05 am | `fa35d234…` |
+
+**Audit**: NOT spawned. 6 recipients is well below the 50-recipient mandatory-audit threshold in CLAUDE.md. Standard guards still ran inline in the scheduler: em-dash check, scheduledAt freshness (`>= now + 60s`), invalid-email regex, done-tag idempotency, round-trip patch verification, em-dash recheck post-patch, `clickTrackingMode = "append"`, `shipping_city` (not `city`).
+
+**Caught + fixed during prep**:
+1. Em dash in the HTML comment of `recovery-email-template.html` (user's draft copy used em dashes; converted to periods per the standing rule). Email-pipeline guard caught it on first test fire.
+2. `.replace()` only swaps first occurrence — `{{retry_url}}` (later `{{checkout_url}}`) appears twice in template (link href + visible text). Switched to `replaceAll()`.
+3. Initial draft sent buyers to CC De Factorij as one of two links; user pivoted twice on this. Final version: 2 links, both on our properties (Shopify cart + our LP arm).
+4. yonic.surny@gmail.com was not in our subscribers DB (Shopify-direct buyer, never opted into our list). `ensureSub` upserted them with `country_code=BE` and the `checkout-recovery-2026-06-04` prospect tag.
+
+**Test sends before fire**: 6 personalized variants all routed to `lionel@musicalbasics.com` test sub for review. User approved.
+
+**Idempotency**: `done-checkout-recovery-2026-06-04` tag applied to each recipient post-fire. Re-runs of the scheduler will skip already-tagged buyers via the `getDoneTaggedSet` filter at the top of `main()`.
+
+**Outcome**: TBD. Honest signals to watch:
+- **Reply rate** — primary signal. If anyone replies "yes the checkout broke" or "yes Shop Pay was confusing," that's actionable diagnostic info beyond what any analytics dashboard can give us.
+- **Click on checkout URL** (LP-side analytics catches this via the new dp_country cookie + utm_content=recovery-checkout).
+- **Subsequent purchase**: track via Shopify "abandoned recovered" attribution OR a new completed-order entry against any of these 6 emails.
+
+Files used:
+- Roster: `_work/checkout-recovery-roster.json`
+- Templates: `_work/recovery-email-template.html` (single), `_work/recovery-email-template-multi.html` (multi)
+- Send script: `_work/send-recovery-real-6.ts`
+- Preview: `_work/preview-recovery-emails.py`
+- Source Shopify export: `_work/checkouts_export.csv` (user-provided)
+
+---
+
 ## 2026-06-04 early morning, Belgium livestream O/P/Q REMAINDER send to the rest of non-local: 18 children, ~1457/arm (Send 96-113)
 
 **Planned**: 2026-06-03's first OPQ fire subsampled the non-local eligible pool from 6,374 down to 2,000. Today fires the remaining 4,370 across the same three arms. Same email + LP pairings (O→/o, P→/p, Q→/q). Goal: increase sample on O/P/Q to ~1,500/arm so the conversion comparison has more signal than the ~667/arm first fire (which produced 1 begin_checkout total).
