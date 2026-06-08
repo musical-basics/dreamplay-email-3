@@ -293,7 +293,12 @@ export async function POST(request: Request) {
   </p>
 </div>
 `;
-      const htmlWithFooter = htmlWithPreheader + unsubscribeFooter;
+      let htmlWithFooter = htmlWithPreheader;
+      if (htmlWithPreheader.includes("</body>")) {
+        htmlWithFooter = htmlWithPreheader.replace("</body>", `${unsubscribeFooter}</body>`);
+      } else {
+        htmlWithFooter = htmlWithPreheader + unsubscribeFooter;
+      }
 
       log("info", "Proxying & optimizing images...");
       const { html: htmlProxied, stats: proxyStats } = await proxyEmailImages(htmlWithFooter, log);
