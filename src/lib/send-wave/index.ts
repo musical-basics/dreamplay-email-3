@@ -218,7 +218,15 @@ export async function runWaveSend(opts: RunWaveSendOptions): Promise<ScheduledCh
         `(${child.recipients} recips) -> ${child.childId} @ ${child.scheduledAt}`,
     );
 
-    await applyDoneTagBatch(client, wave.chunk.map((c) => c.email), opts.doneTag);
+    // Done-tag is best-effort idempotency. A flaky agent API (transient 500 /
+    // ECONNRESET) on the tag must NOT abort a run whose send already scheduled
+    // — that would strand the remaining waves. Log and continue; correctness of
+    // re-runs is guarded by deterministic id/email exclusion of scheduled work.
+    try {
+      await applyDoneTagBatch(client, wave.chunk.map((c) => c.email), opts.doneTag);
+    } catch (e) {
+      console.warn(`  [warn] done-tag failed for ${child.armKey} #${child.chunkIdx + 1} (send already scheduled): ${(e as Error).message}`);
+    }
   }
 
   // Step 9: summary.
