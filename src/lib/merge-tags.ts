@@ -75,9 +75,14 @@ export async function getAllMergeTags(): Promise<MergeTag[]> {
 export async function applyAllMergeTags(
     html: string,
     subscriber: Record<string, any> = {},
-    dynamicVars: Record<string, string> = {}
+    dynamicVars: Record<string, string> = {},
+    // Per-call override of a tag's fallback default_value (used only when the
+    // subscriber/dynamic value is empty). Lets a campaign localize a fallback
+    // like first_name → "Muzikale familie" without touching the global
+    // merge_tags table. Empty object = unchanged global behavior.
+    defaultsOverride: Record<string, string> = {}
 ): Promise<string> {
-    const { html: rendered } = await applyAllMergeTagsWithLog(html, subscriber, dynamicVars)
+    const { html: rendered } = await applyAllMergeTagsWithLog(html, subscriber, dynamicVars, defaultsOverride)
     return rendered
 }
 
@@ -102,7 +107,8 @@ export interface MergeTagLog {
 export async function applyAllMergeTagsWithLog(
     html: string,
     subscriber: Record<string, any> = {},
-    dynamicVars: Record<string, string> = {}
+    dynamicVars: Record<string, string> = {},
+    defaultsOverride: Record<string, string> = {}
 ): Promise<{ html: string; log: MergeTagLog }> {
     const tags = await getAllMergeTags()
     let result = html
@@ -127,20 +133,26 @@ export async function applyAllMergeTagsWithLog(
         let value: string
         let source: string
 
+        // A campaign may override this tag's fallback (e.g. localized
+        // first_name). The override only matters when no live value is found.
+        const hasOverride = Object.prototype.hasOwnProperty.call(defaultsOverride, tag.tag)
+        const effectiveDefault = hasOverride ? defaultsOverride[tag.tag] : tag.default_value
+        const defaultSource = hasOverride ? "default_override" : "default"
+
         switch (tag.category) {
             case "subscriber":
                 if (subscriber[tag.subscriber_field]) {
                     value = subscriber[tag.subscriber_field]
                     source = `subscriber.${tag.subscriber_field}`
                 } else {
-                    value = tag.default_value
-                    source = value ? "default" : "empty"
+                    value = effectiveDefault
+                    source = value ? defaultSource : "empty"
                 }
                 break
 
             case "global":
-                value = tag.default_value
-                source = "global_default"
+                value = effectiveDefault
+                source = hasOverride ? "default_override" : "global_default"
                 break
 
             case "dynamic":
@@ -148,14 +160,14 @@ export async function applyAllMergeTagsWithLog(
                     value = dynamicVars[tag.tag]
                     source = "dynamicVars"
                 } else {
-                    value = tag.default_value
-                    source = value ? "default" : "empty"
+                    value = effectiveDefault
+                    source = value ? defaultSource : "empty"
                 }
                 break
 
             default:
-                value = tag.default_value
-                source = "default"
+                value = effectiveDefault
+                source = defaultSource
         }
 
         result = result.replace(regex, value)

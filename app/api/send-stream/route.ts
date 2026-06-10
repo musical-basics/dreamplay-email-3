@@ -329,10 +329,14 @@ export async function POST(request: Request) {
 
           const unsubscribeUrl = `${baseUrl}/unsubscribe?s=${sub.id}&c=${trackingCampaignId}&w=${campaign.workspace}`;
 
+          // Per-campaign fallback overrides (e.g. localized first_name:
+          // "Muzikale familie"). Only used when a subscriber field is empty.
+          const mergeDefaults = (campaign.variable_values?.merge_defaults as Record<string, string>) || {};
+
           const { html: personalHtml_, log: mergeTagLog } = await applyAllMergeTagsWithLog(htmlFinal, sub, {
             unsubscribe_url: unsubscribeUrl,
             discount_code: campaign.variable_values?.discount_code || "",
-          });
+          }, mergeDefaults);
           let personalHtml = personalHtml_;
 
           // Click tracking. Two modes:
@@ -379,7 +383,7 @@ export async function POST(request: Request) {
             }
           }
 
-          const personalSubject = await applyAllMergeTags(campaign.subject_line || "", sub);
+          const personalSubject = await applyAllMergeTags(campaign.subject_line || "", sub, {}, mergeDefaults);
 
           const resolvedFromName = fromName || campaign.variable_values?.from_name;
           // resolvedFromEmail is in scope from above (computed once before
