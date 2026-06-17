@@ -44,6 +44,14 @@ Always run `date -u` before scheduling a send or computing a scheduled-at value.
 - Per-recipient throttle in send-stream is currently 200ms (= 5/s). Do not lower without confirming the account limit has been raised.
 - Never schedule two send children with the same `scheduledAt`. The Inngest concurrency lock now serializes them at the function layer, but the right pattern is still sequential `scheduledAt` values with enough gap (60s+ for 100-recipient children, 90s+ for 500-recipient children) so the user can interrupt between fires.
 
+### Test sends
+
+When Lionel says "test send" (or "send me a test"), it means: send the real email through the **official `/api/send-stream` route** (deployed at `https://dreamplay-email-3.vercel.app/api/send-stream`) to his test address, NOT an ad-hoc Resend script. This exercises the true send path (merge tags, image proxy, tracking, headers, throttle) so the test reflects what real recipients receive.
+
+- Default test address: `musicalbasics@gmail.com`. Use the subscriber row in the **same workspace as the campaign** (e.g. `dreamplay_support` for DreamPlay buyer sends), targeted via `overrideSubscriberIds`.
+- Send the test against a **throwaway clone** of the campaign, never the real campaign id. `send-stream` writes `sent_history` and flips campaign `status` to `completed`; running it on the real campaign would idempotency-skip the test recipient on the real send and mark the draft completed. Clone -> test -> (optionally delete the clone).
+- Call with `sync: true` for a JSON result. Pass `fromName` / `fromEmail`, or rely on the campaign's `variable_values.from_*`.
+
 ### Click tracking
 
 - Default to `clickTrackingMode: "append"`. The `redirect` mode triggers Gmail bulk-flagging on cadenced sends (observed 2026-05-03 overnight, slots 6-10 collapsed Gmail open rates from ~42% to <2%).
