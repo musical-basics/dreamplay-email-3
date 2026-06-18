@@ -22,8 +22,8 @@ entry shows the audit happened.
 - **Verdict: SAFE.** Sections: idempotency PASS (sent_history guard keyed on campaign_id + candidate ids; 0 existing rows), throttle PASS (~58s << 300s), concurrency lock PASS (global-send-lock limit 1), DB UNIQUE constraint PASS (live-probed 23505), audience PASS (65 unique active ids, 0 test, no off-by-one), scheduledAt fresh PASS (~3h out), rotation N/A, state guards PASS. From-address + tracking domain (`email.dreamplaypianos.com`) aligned.
 - **Caught / corrected before send (this session):** factual fix (keys are final DS5.5/DS6.0, only internals scaled up); sizing wording cites both DS5.5 and DS6.0; "shipped"/"ship date" instead of "delivered"; broken Pro images replaced (Aztec Gold URL had spaces -> 404, Nightmare Black R2 asset 404) with website-hosted assets, all 6 images proxy clean; font switched from Georgia/Playfair to house sans (Helvetica Neue/Arial); line-by-line proofread (comma splices, "Steinway Model D", intro commas); Belgium concert photo added via the emailer asset loader; from-name set to "Lionel From DreamPlay"; "nothing to do if you already selected" line added.
 - **Unsub/consent check:** 0 real purchasers unsubscribed (the 2 unsubscribed rows are Test Accounts on the musicalbasics workspace). Refund-requester Elizabeth Medlin removed (66 -> 65) after her $499 refund was processed.
-- **Deferred:** 2 inactive real buyers (eripianostudio@gmail.com, jaydeireland@gmail.com) and 2 bounced excluded by the active-status filter; inclusion of the inactive pair left as an open question to Lionel.
-- **Outcome:** scheduled 2026-06-18T09:00:00Z; outcome to be recorded after fire.
+- **Post-audit change:** per Lionel, the 2 inactive real buyers (eripianostudio@gmail.com, jaydeireland@gmail.com) were reactivated (status active) and added to the locked list, since this is an ops email all purchasers should receive. **Final audience: 67.** 2 bounced addresses remain excluded (undeliverable).
+- **Outcome:** scheduled 2026-06-18T09:00:00Z to 67 recipients; outcome to be recorded after fire.
 
 ## 2026-06-04 morning, Belgium checkout-recovery to 6 European abandoners: 6 children (Send 114-119)
 
